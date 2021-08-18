@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Certificate_end_date_verification</fullName>
+    <active>true</active>
+    <description>The certificate end date should be later than (or the same day as) the certificate start date.</description>
+    <errorConditionFormula>Certificate_End_Date__c &lt; Certificate_Start_Date__c</errorConditionFormula>
+    <errorDisplayField>Certificate_End_Date__c</errorDisplayField>
+    <errorMessage>The certificate end date should be later than (or the same day as) the certificate start date.</errorMessage>
+</ValidationRule>

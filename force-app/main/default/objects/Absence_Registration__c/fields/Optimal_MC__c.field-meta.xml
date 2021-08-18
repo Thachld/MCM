@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Optimal_MC__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>OAPPMEDCHECK-99</description>
+    <externalId>false</externalId>
+    <label>Optimal MC</label>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

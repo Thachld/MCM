@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Loaded_by_service_xml__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>OAPPMEDCHECK-509
+This field is check when the record is created with the service &quot;AbsenceRegistrationWebService&quot;</description>
+    <externalId>false</externalId>
+    <label>Loaded by service xml</label>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

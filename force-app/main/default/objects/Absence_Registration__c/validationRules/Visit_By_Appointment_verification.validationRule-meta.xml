@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Visit_By_Appointment_verification</fullName>
+    <active>true</active>
+    <description>If the field &quot;Type of visit requested&quot; is set to By appointment, the field Appointment will be made by has to be filled.</description>
+    <errorConditionFormula>IF(ISPICKVAL(Type_of_visit_requested__c,&apos;By appointment&apos;),  ISBLANK(TEXT(Appointment_will_be_made_by__c) ),NOT(ISBLANK(TEXT(Appointment_will_be_made_by__c) )))</errorConditionFormula>
+    <errorDisplayField>Appointment_will_be_made_by__c</errorDisplayField>
+    <errorMessage>This field has to be filled when &quot;Type of visit requested&quot; is set to &apos;By appointment&apos;.</errorMessage>
+</ValidationRule>

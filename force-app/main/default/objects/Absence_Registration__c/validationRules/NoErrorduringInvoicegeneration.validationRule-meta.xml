@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>NoErrorduringInvoicegeneration</fullName>
+    <active>false</active>
+    <description>Prevent user from checking Invoicing On Hold and retriggers the generation of invoice when it is already generated once.</description>
+    <errorConditionFormula>AND(Invoicing_On_Hold__c==true,TEXT(Invoicing_Status__c)!=&apos;Error during Invoice generation&apos;)</errorConditionFormula>
+    <errorMessage>Invoice is already generated.</errorMessage>
+</ValidationRule>

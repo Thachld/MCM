@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Result_End_Date__c</fullName>
+    <description>US 259
+The real end date after doctor&apos;s conlusion</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Real end date after conlusion
+No attestation + Agreement OR Disagreement =&gt; End date absence = End date today
+Attestion in possession + Doctor Agreement =&gt; End date = End date certificate
+Attestion in possession + Doctor Disagreement =&gt; No action yet</inlineHelpText>
+    <label>Result End Date</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Date</type>
+</CustomField>

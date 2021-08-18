@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Medical_Check_Illness__c</fullName>
+    <defaultValue>false</defaultValue>
+    <description>Indicates the goal of the absence registration. US-OAPPMEDCHECK-226</description>
+    <externalId>false</externalId>
+    <label>Medical Check - Illness</label>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Checkbox</type>
+</CustomField>

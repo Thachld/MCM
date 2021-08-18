@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Securex_Number_main_account__c</fullName>
+    <externalId>false</externalId>
+    <formula>IF(ISPICKVAL(Account__r.Account_Level__c,&quot;Department&quot;), Account__r.Parent_Securex_Number__c, Account__r.Securex_Number__c)</formula>
+    <label>Securex Number main account</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

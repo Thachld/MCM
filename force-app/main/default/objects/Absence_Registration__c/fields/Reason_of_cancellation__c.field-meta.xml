@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Reason_of_cancellation__c</fullName>
+    <description>OAPPMEDCHECK-651 : Fields concerning &quot;Raison annulation&quot; (Fr)</description>
+    <externalId>false</externalId>
+    <label>Reason of cancellation</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>AC Therapeutic half-time</fullName>
+                <default>false</default>
+                <label>AC Therapeutic half-time</label>
+            </value>
+            <value>
+                <fullName>AC Employee error to be controlled</fullName>
+                <default>false</default>
+                <label>AC Employee error to be controlled</label>
+            </value>
+            <value>
+                <fullName>AC Covid</fullName>
+                <default>false</default>
+                <label>AC Covid</label>
+            </value>
+            <value>
+                <fullName>AC Resumption of Work</fullName>
+                <default>false</default>
+                <label>AC Resumption of Work</label>
+            </value>
+            <value>
+                <fullName>AC Hospitalization</fullName>
+                <default>false</default>
+                <label>AC Hospitalization</label>
+            </value>
+            <value>
+                <fullName>AC Resignation or departure</fullName>
+                <default>false</default>
+                <label>AC Resignation or departure</label>
+            </value>
+            <value>
+                <fullName>AC Absence from work</fullName>
+                <default>false</default>
+                <label>AC Absence from work</label>
+            </value>
+            <value>
+                <fullName>AC Miscellaneous</fullName>
+                <default>false</default>
+                <label>AC Miscellaneous</label>
+            </value>
+            <value>
+                <fullName>AC Delay too long</fullName>
+                <default>false</default>
+                <label>AC Delay too long</label>
+            </value>
+            <value>
+                <fullName>AC Address inaccurate or missing code</fullName>
+                <default>false</default>
+                <label>AC Address inaccurate or missing code</label>
+            </value>
+            <value>
+                <fullName>AC Imperative date</fullName>
+                <default>false</default>
+                <label>AC Imperative date</label>
+            </value>
+            <value>
+                <fullName>AC No compensation</fullName>
+                <default>false</default>
+                <label>AC No compensation</label>
+            </value>
+            <value>
+                <fullName>AC Extra kilometers</fullName>
+                <default>false</default>
+                <label>AC Extra kilometers</label>
+            </value>
+            <value>
+                <fullName>AC Out of stock</fullName>
+                <default>false</default>
+                <label>AC Out of stock</label>
+            </value>
+            <value>
+                <fullName>AC Pending and no action</fullName>
+                <default>false</default>
+                <label>AC Pending and no action</label>
+            </value>
+            <value>
+                <fullName>AS No doctors</fullName>
+                <default>false</default>
+                <label>AS No doctors</label>
+            </value>
+            <value>
+                <fullName>AS Physician leave</fullName>
+                <default>false</default>
+                <label>AS Physician leave</label>
+            </value>
+            <value>
+                <fullName>AS Forgotten doctor</fullName>
+                <default>false</default>
+                <label>AS Forgotten doctor</label>
+            </value>
+            <value>
+                <fullName>AS Unsafe area</fullName>
+                <default>false</default>
+                <label>AS Unsafe area</label>
+            </value>
+            <value>
+                <fullName>AS Time limit too short</fullName>
+                <default>false</default>
+                <label>AS Time limit too short</label>
+            </value>
+            <value>
+                <fullName>AS Imperative date</fullName>
+                <default>false</default>
+                <label>AS Imperative date</label>
+            </value>
+            <value>
+                <fullName>AS Request received on weekends</fullName>
+                <default>false</default>
+                <label>AS Request received on weekends</label>
+            </value>
+            <value>
+                <fullName>AS Employee already checked on same stop</fullName>
+                <default>false</default>
+                <label>AS Employee already checked on same stop</label>
+            </value>
+            <value>
+                <fullName>AS Miscellaneous</fullName>
+                <default>false</default>
+                <label>AS Miscellaneous</label>
+            </value>
+            <value>
+                <fullName>AS File not processed</fullName>
+                <default>false</default>
+                <label>AS File not processed</label>
+            </value>
+            <value>
+                <fullName>AS Error in transmission to doctor</fullName>
+                <default>false</default>
+                <label>AS Error in transmission to doctor</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

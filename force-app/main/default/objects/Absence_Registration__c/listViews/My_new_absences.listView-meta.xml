@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>My_new_absences</fullName>
+    <columns>NAME</columns>
+    <columns>Account__c</columns>
+    <columns>Employee__c</columns>
+    <columns>Request_Date_and_Time__c</columns>
+    <columns>Start_date__c</columns>
+    <columns>End_date__c</columns>
+    <filterScope>Mine</filterScope>
+    <filters>
+        <field>Status__c</field>
+        <operation>equals</operation>
+        <value>Received</value>
+    </filters>
+    <filters>
+        <field>Securex_Number_main_account__c</field>
+        <operation>notEqual</operation>
+        <value>0191217</value>
+    </filters>
+    <label>1. Mes nouvelles demandes</label>
+    <sharedTo>
+        <group>MCM</group>
+    </sharedTo>
+</ListView>

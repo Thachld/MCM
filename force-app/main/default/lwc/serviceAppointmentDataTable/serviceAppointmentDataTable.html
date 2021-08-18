@@ -1,0 +1,9 @@
+<template>
+    <lightning-datatable data={data} 
+                        columns={columns} key-field = "Id" 
+                        onsort={updateColumnSorting} 
+                        sorted-by={sortBy} 
+                        onrowselection={getSelectedRows}
+                        onrowaction={handleRowAction}
+                        sorted-direction={sortDirection}></lightning-datatable>
+</template>

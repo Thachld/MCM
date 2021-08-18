@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>RATP_7_Mes_demandes_urgentes</fullName>
+    <columns>NAME</columns>
+    <columns>Status__c</columns>
+    <columns>Account__c</columns>
+    <columns>Employee__c</columns>
+    <columns>Request_Date_and_Time__c</columns>
+    <columns>Start_date__c</columns>
+    <columns>End_date__c</columns>
+    <filterScope>Mine</filterScope>
+    <filters>
+        <field>Urgent_MC__c</field>
+        <operation>equals</operation>
+        <value>1</value>
+    </filters>
+    <filters>
+        <field>Securex_Number_main_account__c</field>
+        <operation>equals</operation>
+        <value>0191217</value>
+    </filters>
+    <filters>
+        <field>Status__c</field>
+        <operation>notEqual</operation>
+        <value>Result to customer,MC canceled</value>
+    </filters>
+    <label>RATP 7. Mes demandes urgentes</label>
+    <sharedTo>
+        <group>France_Medical_Control_RATP</group>
+    </sharedTo>
+</ListView>

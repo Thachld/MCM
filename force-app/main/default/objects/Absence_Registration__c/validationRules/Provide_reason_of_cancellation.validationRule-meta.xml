@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Provide_reason_of_cancellation</fullName>
+    <active>true</active>
+    <description>Provide a reason of cancellation when absence is cancelled</description>
+    <errorConditionFormula>TEXT(Status__c ) = &apos;MC Canceled&apos;
+&amp;&amp;  ISBLANK(TEXT( Reason_of_cancellation__c ))</errorConditionFormula>
+    <errorMessage>A reason of cancellation is required</errorMessage>
+</ValidationRule>

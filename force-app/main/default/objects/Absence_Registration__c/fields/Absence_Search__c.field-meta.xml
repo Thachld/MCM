@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Absence_Search__c</fullName>
+    <description>US 336- Request medical check (France)
+Display ongoing absences to employees</description>
+    <externalId>false</externalId>
+    <formula>&quot;Name: &quot; + Name + &apos; &apos; + BR() + 
+&quot;Date de soumission: &quot; + TEXT( DATEVALUE(CreatedDate)) + &apos; &apos; + BR() + 
+&quot;Status: &quot; + TEXT( Status_MC__c )</formula>
+    <label>Absence Search</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Text</type>
+    <unique>false</unique>
+</CustomField>

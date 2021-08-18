@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Date_Time_medical_check__c</fullName>
+    <description>US 259 &amp;&amp; 396 &amp;&amp; 405
+After the MC, the doctor has to register date/time of either home visit or convocation</description>
+    <externalId>false</externalId>
+    <inlineHelpText>Date/Time of home visit or Convocation</inlineHelpText>
+    <label>Date/Time medical check</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>DateTime</type>
+</CustomField>

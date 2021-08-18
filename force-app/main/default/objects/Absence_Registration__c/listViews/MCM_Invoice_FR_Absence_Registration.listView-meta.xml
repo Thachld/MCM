@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>MCM_Invoice_FR_Absence_Registration</fullName>
+    <filterScope>Queue</filterScope>
+    <label>CVM Facturation</label>
+    <queue>MCM_Invoice_FR</queue>
+    <sharedTo>
+        <allInternalUsers></allInternalUsers>
+    </sharedTo>
+</ListView>

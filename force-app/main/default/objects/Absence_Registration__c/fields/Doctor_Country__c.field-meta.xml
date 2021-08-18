@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Doctor_Country__c</fullName>
+    <description>US-OAPPMEDCHECK-244</description>
+    <externalId>false</externalId>
+    <label>Doctor Country</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>FRA</fullName>
+                <default>false</default>
+                <label>France</label>
+            </value>
+            <value>
+                <fullName>BEL</fullName>
+                <default>false</default>
+                <label>Belgium</label>
+            </value>
+            <value>
+                <fullName>LUX</fullName>
+                <default>false</default>
+                <label>Luxembourg</label>
+            </value>
+            <value>
+                <fullName>NLD</fullName>
+                <default>false</default>
+                <label>Netherlands</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

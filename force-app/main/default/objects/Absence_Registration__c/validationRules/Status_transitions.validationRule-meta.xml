@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Status_transitions</fullName>
+    <active>true</active>
+    <description>Rule to avoid statuses being reverted</description>
+    <errorConditionFormula>AND(
+    ISCHANGED(Status__c),
+    OR(
+        TEXT(PRIORVALUE(Status__c))= &quot;MC canceled&quot;,
+        TEXT(PRIORVALUE(Status__c))= &quot;Result to customer&quot;,
+        AND (
+            NOT(ISPICKVAL(Status__c, &quot;MC canceled&quot;)),
+NOT(ISPICKVAL(Status__c, &quot;Run Process&quot;)),
+                (
+                    CASE( Status__c ,
+                    &quot;Received&quot;,1,
+                    &quot;Ready for Treatment&quot;,2,
+                    &quot;Treated - no MC&quot;,3,
+                    &quot;MC initiated&quot;,3,
+                    &quot;MC completed&quot;,4,
+                    &quot;Result to customer&quot;,5,
+                    0)
+                &lt;&gt;
+                    (CASE(PRIORVALUE(Status__c) ,
+                   &quot;Received&quot;,1,
+                    &quot;Ready for Treatment&quot;,2, 
+                    &quot;Treated - no MC&quot;,3,                   
+                    &quot;MC initiated&quot;,3,
+                  &quot;MC completed&quot;,4,
+                    &quot;Result to customer&quot;,5,
+                    0)
+                +1)
+            )
+        ) 
+    ),
+    AND(
+     IF(Simulation__c = FALSE, TRUE, FALSE)),
+IF(ISCHANGED(Simulation__c), false, true)
+    )</errorConditionFormula>
+    <errorMessage>This status change is not allowed.</errorMessage>
+</ValidationRule>

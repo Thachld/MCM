@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Result_Code__c</fullName>
+    <description>US 259 - 396 - 405
+The result code after the doctor&apos;s conclusion.
+To be used in the transmission XML</description>
+    <externalId>false</externalId>
+    <label>Result Code</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>0 - In accordance</fullName>
+                <default>false</default>
+                <label>0 - In accordance</label>
+            </value>
+            <value>
+                <fullName>1 - In disagreement</fullName>
+                <default>false</default>
+                <label>1 - In disagreement</label>
+            </value>
+            <value>
+                <fullName>2 - Lost expertise</fullName>
+                <default>false</default>
+                <label>2 - Lost expertise</label>
+            </value>
+            <value>
+                <fullName>3 - Won expertise</fullName>
+                <default>false</default>
+                <label>3 - Won expertise</label>
+            </value>
+            <value>
+                <fullName>4 - No illness or accident</fullName>
+                <default>false</default>
+                <label>4 - No illness or accident</label>
+            </value>
+            <value>
+                <fullName>5 - Decision maintained with new certificate</fullName>
+                <default>false</default>
+                <label>5 - Decision maintained with new certificate</label>
+            </value>
+            <value>
+                <fullName>6 - In accordance for visit day</fullName>
+                <default>false</default>
+                <label>6 - In accordance for visit day</label>
+            </value>
+            <value>
+                <fullName>7 - Not in accordance for visit date</fullName>
+                <default>false</default>
+                <label>7 - Not in accordance for visit date</label>
+            </value>
+            <value>
+                <fullName>8 - Early resumption in agreement with attending physician</fullName>
+                <default>false</default>
+                <label>8 - Early resumption in agreement with attending physician</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

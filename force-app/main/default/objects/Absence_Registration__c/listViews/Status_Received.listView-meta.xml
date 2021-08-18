@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Status_Received</fullName>
+    <columns>NAME</columns>
+    <columns>Request_Date_and_Time__c</columns>
+    <columns>Employee__c</columns>
+    <columns>Account__c</columns>
+    <columns>Channel__c</columns>
+    <columns>Controle_requested__c</columns>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>Status__c</field>
+        <operation>equals</operation>
+        <value>Received</value>
+    </filters>
+    <label>Status &apos;Received&apos;</label>
+    <sharedTo>
+        <allInternalUsers></allInternalUsers>
+    </sharedTo>
+</ListView>

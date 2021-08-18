@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Doctor_conclusion__c</fullName>
+    <description>US 259 &amp;&amp; 396 &amp;&amp; 405
+After the MC, the doctor has to decide if he accepts or disagree with the employee&apos;s absence
+US 447
+In FR _ The decision is registered by the operator for a doctor</description>
+    <externalId>false</externalId>
+    <label>Doctor conclusion</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Acceptation</fullName>
+                <default>false</default>
+                <label>Acceptation</label>
+            </value>
+            <value>
+                <fullName>Refusal</fullName>
+                <default>false</default>
+                <label>Refusal</label>
+            </value>
+            <value>
+                <fullName>Arrêt de travail médicalement justifié ce jour</fullName>
+                <default>false</default>
+                <label>Arrêt de travail médicalement justifié ce jour</label>
+            </value>
+            <value>
+                <fullName>Arrêt de travail médicalement justifié ce jour - Prolongation possible</fullName>
+                <default>false</default>
+                <label>Arrêt de travail médicalement justifié ce jour - Prolongation possible</label>
+            </value>
+            <value>
+                <fullName>Arrêt justifié reprise envisageable</fullName>
+                <default>false</default>
+                <label>Arrêt justifié reprise envisageable</label>
+            </value>
+            <value>
+                <fullName>Absence de réponse au lieu de résidence</fullName>
+                <default>false</default>
+                <label>Absence de réponse au lieu de résidence</label>
+            </value>
+            <value>
+                <fullName>Absence du salarie confirmée par un tiers</fullName>
+                <default>false</default>
+                <label>Absence du salarie confirmée par un tiers</label>
+            </value>
+            <value>
+                <fullName>Arrêt de travail plus médicalement justifié ce jour</fullName>
+                <default>false</default>
+                <label>Arrêt de travail plus médicalement justifié ce jour</label>
+            </value>
+            <value>
+                <fullName>Refus de contrôle ou d&apos;examen</fullName>
+                <default>false</default>
+                <label>Refus de contrôle ou d&apos;examen</label>
+            </value>
+            <value>
+                <fullName>Adresse incomplète ou problématique</fullName>
+                <default>false</default>
+                <label>Adresse incomplète ou problématique</label>
+            </value>
+            <value>
+                <fullName>Problème de code d&apos;accès</fullName>
+                <default>false</default>
+                <label>Problème de code d&apos;accès</label>
+            </value>
+            <value>
+                <fullName>Salarié pas en arrêt de travail</fullName>
+                <default>false</default>
+                <label>Salarié pas en arrêt de travail</label>
+            </value>
+            <value>
+                <fullName>Salarié non présenté au cabinet</fullName>
+                <default>false</default>
+                <label>Salarié non présenté au cabinet</label>
+            </value>
+            <value>
+                <fullName>Arrêt de travail non justifié médicalement ce jour</fullName>
+                <default>false</default>
+                <isActive>false</isActive>
+                <label>Arrêt de travail non justifié médicalement ce jour</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

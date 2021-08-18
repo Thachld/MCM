@@ -1,0 +1,91 @@
+<aura:component implements="flexipage:availableForAllPageTypes,force:appHostable,force:lightningQuickAction" access="global" controller="createInvoiceController">
+    <!-- attributes -->
+    <lightning:workspaceAPI aura:id="workspace" />
+    <aura:attribute name="disabled" type="Boolean" default="false" />
+    <aura:attribute name="showSpinner" type="Boolean" default="true" />
+    <aura:attribute name="data" type="Object"/>
+    <aura:attribute name="columns" type="List"/>
+    <aura:attribute name="batchResults" type="Object"/>
+    <aura:attribute name="resultColumns" type="List"/>
+    <aura:attribute name="options" type="List" access="PRIVATE"/>
+    <aura:attribute name="selectedValue" type="String" access="PRIVATE"/>
+    <aura:attribute name="startDate" type="Date" />
+    <aura:attribute name="endDate" type="Date" />
+    <aura:attribute name="lastInvoiceBatchDate" type="Date" />
+    
+    <!-- handlers-->
+    <aura:handler name="init" value="{!this}" action="{!c.init}" />
+    <lightning:card class="slds-p-around_medium">
+    <lightning:card aura:id="createInvoiceCmpContainer" class="slds-card_boundary grey">
+        <aura:set attribute="title">
+            <div class="slds-p-bottom_x-small">
+                <lightning:icon iconName="utility:file" size="small"/>
+                <strong>{!$Label.c.CreateInvoicingBatchTitle}</strong>
+            </div>
+        </aura:set>
+        <aura:if isTrue="{!v.showSpinner}">
+            <lightning:spinner/>
+        </aura:if>
+
+        <c:MessageContainer aura:id="messageContainer"/>
+        
+        <div class="slds-p-right_small slds-p-left_small">
+            <div class="slds-grid slds-gutters">
+                <div class="slds-col slds-size_1-of-3 slds-align-bottom">
+                    <b>{!$Label.c.InvoicingType}</b>
+                </div>
+                <div class="slds-col slds-size_2-of-3">
+                    <lightning:select name="type" label="" aura:id="type" value="{!v.selectedValue}">
+                        <aura:iteration items="{!v.options}" var="option">
+                            <option text="{!option.label}" value="{!option.id}" selected="{!option.selected}"/>
+                        </aura:iteration>
+                    </lightning:select>
+                </div>
+            </div>
+            
+            <!-- <aura:if isTrue="{!v.selectedValue=='Service Invoicing'}">
+                <div class="slds-grid slds-gutters">
+                    <div class="slds-col slds-size_1-of-3 slds-align-bottom">
+                        <b>{!$Label.c.InvoicingPeriod}</b>
+                    </div>
+                    <div class="slds-col slds-size_1-of-3">
+                        <ui:inputDate value="{!v.startDate}" label="From"  displayDatePicker="true" updateOn="change" />
+                    </div>
+                    <div class="slds-col slds-size_1-of-3">    
+                        <ui:inputDate value="{!v.endDate}" label="To" displayDatePicker="true" updateOn="change" />
+                    </div>
+                </div>
+            </aura:if> -->
+
+            <div class="slds-m-top_medium slds-p-right_small slds-text-align_right">
+                <lightning:button disabled="{!v.disabled}" variant="brand" label="Go" onclick="{!c.handleClick}"/>
+            </div>
+
+            <br/>
+            <b>{!$Label.c.ContractsBlockedForInvoicing}</b>
+            <div class="slds-table_header-hidden">
+                <lightning:datatable keyField="id"
+                                    data="{!v.data}"
+                                    columns="{!v.columns}"
+                                    hideCheckboxColumn="true"
+                                    hideTableHeader="false"/>
+            </div>
+
+        </div>
+    </lightning:card>
+
+    <lightning:card class="slds-card_boundary grey">
+        <aura:set attribute="title">
+            <div class="slds-p-bottom_x-small">
+                <lightning:icon iconName="custom:custom48" size="small"/>
+                <strong> {!$Label.c.InvoicingBatches}  </strong>
+            </div>
+        </aura:set>
+            <lightning:datatable keyField="id"
+                                data="{!v.batchResults}"
+                                columns="{!v.resultColumns}"
+                                hideCheckboxColumn="true"
+                                hideTableHeader="false"/>
+    </lightning:card>
+</lightning:card>
+</aura:component>

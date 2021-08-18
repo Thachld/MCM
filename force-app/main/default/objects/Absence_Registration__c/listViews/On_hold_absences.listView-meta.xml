@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>On_hold_absences</fullName>
+    <columns>NAME</columns>
+    <columns>OWNER.ALIAS</columns>
+    <columns>Request_Date_and_Time__c</columns>
+    <columns>Employee__c</columns>
+    <columns>Account__c</columns>
+    <columns>Channel__c</columns>
+    <columns>Status__c</columns>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>On_hold__c</field>
+        <operation>equals</operation>
+        <value>1</value>
+    </filters>
+    <filters>
+        <field>RECORDTYPE</field>
+        <operation>equals</operation>
+        <value>Absence_Registration__c.MCM_FR</value>
+    </filters>
+    <label>2. Tous les arrêts en attente</label>
+    <sharedTo>
+        <group>FR_MCM</group>
+    </sharedTo>
+</ListView>

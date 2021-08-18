@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>BE_MC_Ongoing</fullName>
+    <columns>NAME</columns>
+    <columns>Employee__c</columns>
+    <columns>Request_Date_and_Time__c</columns>
+    <columns>Start_date__c</columns>
+    <columns>Controle_requested__c</columns>
+    <columns>Status_MC__c</columns>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>Status_MC__c</field>
+        <operation>equals</operation>
+        <value>Received,MC ongoing</value>
+    </filters>
+    <filters>
+        <field>RECORDTYPE</field>
+        <operation>equals</operation>
+        <value>Absence_Registration__c.MCM_BE</value>
+    </filters>
+    <label>2. Medical Checks Ongoing</label>
+    <sharedTo>
+        <group>MCM_BE_Customer_Users</group>
+    </sharedTo>
+</ListView>

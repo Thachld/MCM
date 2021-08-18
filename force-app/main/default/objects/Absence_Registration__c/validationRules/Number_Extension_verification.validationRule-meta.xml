@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Number_Extension_verification</fullName>
+    <active>true</active>
+    <description>The number must be bigger than 0. US-OAPPMEDCHECK-244</description>
+    <errorConditionFormula>Number_of_extension__c  &lt;=  0</errorConditionFormula>
+    <errorDisplayField>Number_of_extension__c</errorDisplayField>
+    <errorMessage>Please enter a number bigger than 0.</errorMessage>
+</ValidationRule>

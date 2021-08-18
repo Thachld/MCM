@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ListView xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>BE_Absences</fullName>
+    <columns>NAME</columns>
+    <columns>Status__c</columns>
+    <columns>Type_of_Request__c</columns>
+    <columns>Start_date__c</columns>
+    <columns>Certificate__c</columns>
+    <filterScope>Everything</filterScope>
+    <filters>
+        <field>Share_to_MCM_BE__c</field>
+        <operation>equals</operation>
+        <value>1</value>
+    </filters>
+    <label>BE Absences</label>
+    <sharedTo>
+        <allInternalUsers></allInternalUsers>
+    </sharedTo>
+</ListView>

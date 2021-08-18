@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Reason_closure__c</fullName>
+    <description>OAPPMEDCHECK-98
+Why the workorder is created or not</description>
+    <externalId>false</externalId>
+    <label>Reason closure</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>MC requested by employer on employee level</fullName>
+                <default>false</default>
+                <label>MC requested by employer on employee level</label>
+            </value>
+            <value>
+                <fullName>Exempt from MC by employer on employee level</fullName>
+                <default>false</default>
+                <label>Exempt from MC by employer on employee level</label>
+            </value>
+            <value>
+                <fullName>MC requested by employer on absence registration</fullName>
+                <default>false</default>
+                <label>MC requested by employer on absence registration</label>
+            </value>
+            <value>
+                <fullName>Exempt from MC by employer on absence registration</fullName>
+                <default>false</default>
+                <label>Exempt from MC by employer on absence registration</label>
+            </value>
+            <value>
+                <fullName>No criteria fit to execute MC</fullName>
+                <default>false</default>
+                <label>No criteria fit to execute MC</label>
+            </value>
+            <value>
+                <fullName>Criteria decided no MC</fullName>
+                <default>false</default>
+                <label>Criteria decided no MC</label>
+            </value>
+            <value>
+                <fullName>Criteria decided to execute MC</fullName>
+                <default>false</default>
+                <label>Criteria decided to execute MC</label>
+            </value>
+            <value>
+                <fullName>No need for MC - absence fully in past</fullName>
+                <default>false</default>
+                <label>No need for MC - absence fully in past</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

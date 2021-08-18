@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Technical_Status__c</fullName>
+    <externalId>false</externalId>
+    <label>Technical Status</label>
+    <required>false</required>
+    <trackHistory>false</trackHistory>
+    <trackTrending>false</trackTrending>
+    <type>Picklist</type>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value>
+                <fullName>Ready for extra checks</fullName>
+                <default>false</default>
+                <label>Ready for extra checks</label>
+            </value>
+            <value>
+                <fullName>Run process</fullName>
+                <default>false</default>
+                <label>Run process</label>
+            </value>
+            <value>
+                <fullName>Initiate MC</fullName>
+                <default>false</default>
+                <label>Initiate MC</label>
+            </value>
+            <value>
+                <fullName>Ready for Treatment</fullName>
+                <default>false</default>
+                <label>Ready for Treatment</label>
+            </value>
+            <value>
+                <fullName>MC initiated</fullName>
+                <default>false</default>
+                <label>MC initiated</label>
+            </value>
+            <value>
+                <fullName>Treated - no MC</fullName>
+                <default>false</default>
+                <label>Treated - no MC</label>
+            </value>
+            <value>
+                <fullName>Received</fullName>
+                <default>false</default>
+                <label>Received</label>
+            </value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>
