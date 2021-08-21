@@ -22,6 +22,9 @@ public class CustomerInvoicingTest
         List<Service__c> services = UtilsData.generateFRServices();
         insert services;
 
+        Zip_Code__c zipWavre = new Zip_Code__c(Name='1300',City__c='Wavre');
+        insert zipWavre;
+
         Map<String,Object> accValueMap = new Map<String,Object>();
         accValueMap.put('Invoicing_Terms__c','30');
         accValueMap.put('Invoicing_on_this_account__c','Yes');
@@ -47,6 +50,21 @@ public class CustomerInvoicingTest
                                     , false);
             Integer n= 7639241 + 97*i;
             mainAcc.Enterprise_Number__c= 0+String.valueOf(n)+91;
+            if(i==0){
+                mainAcc.Maximum_Distance_for_Convocation__c = '20';
+                mainAcc.Maximum_Distance_for_home_visits__c = '20';
+            }
+            else if(i==1){
+                mainAcc.Maximum_Distance_for_Convocation__c = '30';
+                mainAcc.Maximum_Distance_for_home_visits__c = '30';
+            }else if(i==2){
+                mainAcc.Maximum_Distance_for_Convocation__c = '40';
+                mainAcc.Maximum_Distance_for_home_visits__c = '40';
+            }
+            if(i==3){
+                mainAcc.Maximum_Distance_for_Convocation__c = '50';
+                mainAcc.Maximum_Distance_for_home_visits__c = '50';
+            }
             mainAccList.add(mainAcc); 
         }
         insert mainAccList;    
@@ -60,7 +78,6 @@ public class CustomerInvoicingTest
         accValueMap.remove('Securex_Number__c');
         for(Account mainAcc : [SELECT Id, Official_HouseNr__c FROM Account WHERE RecordTypeId=:AccountTriggerHandler.RT_ACCOUNT_MAIN])
         {
-            m++;
             Account invDep = UtilsData.generateAccount('Invoicing Dep ' +''+ m
                                 , AccountTriggerHandler.RT_DEPARTMENT
                                 , accValueMap
@@ -68,10 +85,23 @@ public class CustomerInvoicingTest
             invDep.ParentId = mainAcc.Id;
             invDep.Department_Number__c= m;
             invDep.Date_in__c=system.today();
-            System.debug('invDep.Department_Number__c: '+invDep.Department_Number__c);
+            if(m==0){
+                invDep.Maximum_Distance_for_Convocation__c = '20';
+                invDep.Maximum_Distance_for_home_visits__c = '20';
+            }
+            else if(m==1){
+                invDep.Maximum_Distance_for_Convocation__c = '30';
+                invDep.Maximum_Distance_for_home_visits__c = '30';
+            }else if(m==2){
+                invDep.Maximum_Distance_for_Convocation__c = '40';
+                invDep.Maximum_Distance_for_home_visits__c = '40';
+            }
+            if(m==3){
+                invDep.Maximum_Distance_for_Convocation__c = '50';
+                invDep.Maximum_Distance_for_home_visits__c = '50';
+            }
             invDepList.add(invDep);            
-            System.debug('accvaluemap'+ accValueMap);
-            System.debug('dep name'+ invDep.Name);
+            m++;
         }
         insert invDepList;
 
@@ -139,21 +169,42 @@ public class CustomerInvoicingTest
                                         ,Version__c=1
                                         ,RecordTypeId=ContractHomeManager.mcmRtFRId
                                         ,Service_Type__c = StaticConstants.TYPE_REGISTRATION_CERTIFICATES
-                                        ,Amount_of_km_in_forfait__c=20);
-            ctrHList.add(ctrH);
+                                        ,Amount_of_km_in_forfait__c=20
+                                        ,Todos_after_invoicing__c = 'Todos after invoicing');
+            ctrH.Amount_of_km_in_forfait__c = l*10;
+            Contract_Home__c ctrSpecific = new Contract_Home__c(Account__c=invAcc.ParentId
+                                        ,Invoicing_Account__c = invAcc.Id
+                                        ,Yearly_contribution__c=true
+                                        ,Next_due_date__c = Date.today().addMonths(-1).toStartOfMonth()
+                                        ,In_Place_Date__c=Date.today().addYears(-12)
+                                        ,Signature_Date__c=Date.today().addYears(-12)
+                                        ,Specific_VAT_Picklist__c = l==2?'20.00%':null
+                                        ,Version__c=1
+                                        ,RecordTypeId=ContractHomeManager.mcmRtFRId
+                                        ,Service_Type__c = StaticConstants.TYPE_REGISTRATION_CERTIFICATES
+                                        ,Amount_of_km_in_forfait__c=20
+                                        ,Todos_before_invoicing__c = 'Todos before invoicing'
+                                        ,Specific_Contract__c=true);
+            ctrHList.add(ctrH);                            
+            ctrHList.add(ctrSpecific);
         }
         insert ctrHList;
-
+        
+        Id packId;
         for(Contract_Home__c ctrH : [SELECT Id FROM Contract_Home__c])
         {
-            for(Service__c s : [SELECT Id, Current_Standard_Price__c, Service_Category__c FROM Service__c] )
+            for(Service__c s : [SELECT Id, Current_Standard_Price__c, Service_Category__c FROM Service__c WHERE Service_Category__c!='Miscellaneous'] )
             {
                 if(s.Service_Category__c=='Annual fee')
                 {
                     csliList.add(new Contractual_Service_Line_Item__c(Price_Rate_1__c=s.Current_Standard_Price__c
                     ,Contract_Home__c=ctrH.Id,Service__c=s.Id,Is_From_Migration__c=TRUE));
                 }
-                else if(s.Service_Category__c!='Pack' && s.Service_Category__c!='Miscellaneous')
+                else if(s.Service_Category__c=='Pack')
+                {
+                    packId = s.Id;
+                }
+                else
                 {
                     csliList.add(new Contractual_Service_Line_Item__c(Price_Rate_1__c=s.Current_Standard_Price__c
                                 ,Contract_Home__c=ctrH.Id,Service__c=s.Id));
@@ -161,6 +212,8 @@ public class CustomerInvoicingTest
             }
 
         }
+        csliList.add(new Contractual_Service_Line_Item__c(Price_Rate_1__c=1000, Pack_Volume__c=10
+                    ,Contract_Home__c=ctrHList[0].Id,Service__c=packId,Is_From_Migration__c=TRUE));
         insert csliList;
         
         Map<Id,Id> contractIdPerAccIdMap = new Map<Id,Id>();
@@ -190,72 +243,6 @@ public class CustomerInvoicingTest
             arList.add(ar);
         }
         insert arList;
-
-/*         List<WorkOrder> workOrderList = new List<WorkOrder>();
-        for(Absence_Registration__c ar : [SELECT Id, Account__r.Name FROM Absence_Registration__c])
-        {
-            if(ar.Account__r.Name.contains('1') || ar.Account__r.Name.contains('3')  || ar.Account__r.Name.contains('5')  
-                || ar.Account__r.Name.contains('7')  || ar.Account__r.Name.contains('9'))
-            {
-
-                WorkOrder woHomeVisit = new WorkOrder(AccountId = ar.Account__c
-                                                ,Absence_Registration__c = ar.Id
-                                                , WorkTypeId=homeVisitWorkType.Id); 
-                workOrderList.add(woHomeVisit);
-            }
-            else {
-
-                WorkOrder woConvocation = new WorkOrder(AccountId = ar.Account__c
-                                                    ,Absence_Registration__c = ar.Id
-                                                    , WorkTypeId=convocationWorkType.Id); 
-                workOrderList.add(woConvocation);
-            }
-        }
-        insert workOrderList;
-
-
-        List<ServiceAppointment> saList = new List<ServiceAppointment>();
-        for(WorkOrder wo : [SELECT Id, WorkTypeId, Absence_Registration__r.Contract_Home__c FROM WorkOrder])
-        {
-            if(wo.WorkTypeId==homeVisitWorkType.Id)
-            {
-                ServiceAppointment saHomeVisit = new serviceAppointment(Status = 'Scheduled'
-                                                                        ,ParentRecordId = wo.Id
-                                                                        ,Work_Order_tech__c= wo.Id
-                                                                        ,Contract_Home__c= wo.Absence_Registration__r.Contract_Home__c
-                                                                        ,SchedStartTime= System.now().addDays(-20)
-                                                                        ,SchedEndTime= System.now().addDays(20) 
-                                                                        ,EarliestStartTime= System.now().addDays(-20)
-                                                                        ,Start_Date__c=System.today().addDays(-10)                                                           
-                                                                        ,ActualStartTime=System.now().addDays(-10)
-                                                                        ,ActualEndTime=System.now().addDays(10)
-                                                                        ,Km_mountain__c = 40
-                                                                        ,Km_Flat__c = 30
-                                                                        ,Date_Time_Home_Visit__c = Date.newinstance(2021,2,6)
-                                                                        ,Notify_Doctor__c=false);
-                saList.add(saHomeVisit);                                                            
-            }
-            else
-            {
-                ServiceAppointment saConvocation = new serviceAppointment(Status = 'Scheduled'
-                                                                        ,ParentRecordId = wo.Id
-                                                                        ,Work_Order_tech__c= wo.Id
-                                                                        ,Contract_Home__c= wo.Absence_Registration__r.Contract_Home__c
-                                                                        ,SchedStartTime= System.now().addDays(-15)
-                                                                        ,SchedEndTime= System.now().addDays(15)
-                                                                        ,EarliestStartTime= System.now().addDays(-20)
-                                                                        ,Start_Date__c=System.today().addDays(-10)  
-                                                                        ,ActualStartTime=System.now().addDays(-5)
-                                                                        ,ActualEndTime=System.now().addDays(5)
-                                                                        ,Km_mountain__c = 10
-                                                                        ,Km_Flat__c = 30
-                                                                        ,Date_Time_convocation__c = Date.newinstance(2021,2,6)
-                                                                        ,Notify_Doctor__c=false);
-                saList.add(saConvocation); 
-            }
-        }
-        insert saList;
- */
     }
 
     // @isTest static void findContractsBlockedForInvoicing()
@@ -292,6 +279,7 @@ public class CustomerInvoicingTest
         insert workOrderList;
 
         List<ServiceAppointment> saList = new List<ServiceAppointment>();
+        Integer i=0;
         for(WorkOrder wo : [SELECT Id, WorkTypeId, Absence_Registration__r.Contract_Home__c FROM WorkOrder])
         {
             if(wo.WorkTypeId==homeVisitWorkType.Id)
@@ -306,8 +294,10 @@ public class CustomerInvoicingTest
                                                                         ,ActualEndTime=System.now().addDays(10)
                                                                         ,Km_mountain__c = 40
                                                                         ,Km_Flat__c = 30
+                                                                        ,Montant_Frais_divers__c = 100
+                                                                        ,Extra_remuneration__c = 50
                                                                         ,Date_Time_Home_Visit__c = Date.newinstance(2021,2,6)
-                                                                        ,Notify_Doctor__c=false);
+                                                                        ,Notify_Doctor__c=false,PostalCode='1300');
                 saList.add(saHomeVisit);                                                            
             }
             else
@@ -322,12 +312,23 @@ public class CustomerInvoicingTest
                                                                         ,ActualEndTime=System.now().addDays(5)
                                                                         ,Km_mountain__c = 10
                                                                         ,Km_Flat__c = 30
+                                                                        ,Montant_Frais_divers__c = 100
+                                                                        ,Extra_remuneration__c = 50
                                                                         ,Date_Time_convocation__c = Date.newinstance(2021,2,6)
-                                                                        ,Notify_Doctor__c=false);
+                                                                        ,Notify_Doctor__c=false,PostalCode='1300');
                 saList.add(saConvocation); 
             }
         }
+        saList[1].No_Invoice__c = true;
+        saList[2].No_Honoraria__c = true;
         insert saList;
+
+        List<Task> tskList = new List<Task>();
+        Task sms = new Task(WhatId = saList[0].Id,Event_Type__c='MCM SMS Employee',RecordTypeId=UtilsConstants.RT_ID_TASK_MCM_TASK);
+        tskList.add(sms);
+        Task letter = new Task(WhatId = saList[0].Id,Event_Type__c='MCM Letter Employee',RecordTypeId=UtilsConstants.RT_ID_TASK_MCM_TASK);
+        tskList.add(letter);
+        insert tskList;
 
         Account accountToInvoice = [SELECT Id, Name, Invoicing_Account__c, Invoicing_on_this_account__c, ParentId, Active_department__c
         FROM Account WHERE RecordTypeId=:AccountTriggerHandler.RT_DEPARTMENT AND Invoicing_On_This_Account__c='Yes' LIMIT 1];
@@ -469,6 +470,7 @@ public class CustomerInvoicingTest
                                                                         ,ActualEndTime=System.now().addDays(10)
                                                                         ,Km_mountain__c = 40
                                                                         ,Km_Flat__c = 30
+                                                                        ,Montant_Frais_divers__c = 100
                                                                         ,Date_Time_Home_Visit__c = Date.newinstance(2021,2,6)
                                                                         ,Notify_Doctor__c=false);
                 saList.add(saHomeVisit);                                                            
@@ -485,6 +487,7 @@ public class CustomerInvoicingTest
                                                                         ,ActualEndTime=System.now().addDays(5)
                                                                         ,Km_mountain__c = 10
                                                                         ,Km_Flat__c = 30
+                                                                        ,Montant_Frais_divers__c = 100
                                                                         ,Date_Time_convocation__c = Date.newinstance(2021,2,6)
                                                                         ,Notify_Doctor__c=false);
                 saList.add(saConvocation); 
@@ -600,6 +603,7 @@ public class CustomerInvoicingTest
                                                                         ,ActualEndTime=System.now().addDays(10)
                                                                         ,Km_mountain__c = 40
                                                                         ,Km_Flat__c = 30
+                                                                        ,Montant_Frais_divers__c = 100
                                                                         ,Date_Time_Home_Visit__c = Date.newinstance(2021,2,6)
                                                                         ,Notify_Doctor__c=false);
                 saList.add(saHomeVisit);                                                            
@@ -618,6 +622,7 @@ public class CustomerInvoicingTest
                                                                         ,ActualEndTime=System.now().addDays(5)
                                                                         ,Km_mountain__c = 10
                                                                         ,Km_Flat__c = 30
+                                                                        ,Montant_Frais_divers__c = 100
                                                                         ,Date_Time_convocation__c = Date.newinstance(2021,2,6)
                                                                         ,Notify_Doctor__c=false);
                 saList.add(saConvocation); 

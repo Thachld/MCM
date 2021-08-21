@@ -555,9 +555,6 @@ public class InvoiceManager
 					} 
 					else if(inv.Contract_Country_Picklist__c=='FRA')
 					{
-						system.debug('AMU '+ inv.Invoicing_Account__r.Subject_to_VAT__c);
-						system.debug('AMU '+ inv.Invoicing_Account__c);
-
 						if(inv.Specific_VAT__c == null || inv.Specific_VAT__c==0.00)
 						{
 							inv.VAT_Code_Text__c = 'P5';

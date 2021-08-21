@@ -149,7 +149,7 @@ public class ContractHomeManager
 			if(contractNumberBeMCM == null)
 			{
 				AggregateResult[] maxNumberContract = [SELECT MAX(Contract_Digit__c) maxNumberContract FROM Contract_Home__c 
-											WHERE RecordTypeId =:mcmRtBEId];
+											WHERE RecordTypeId =:mcmRtBEId OR RecordTypeId =:mcmRtOneshotBeId];
 				
 				if(maxNumberContract[0].get('maxNumberContract') != null) contractNumberBeMCM = Integer.valueOf(maxNumberContract[0].get('maxNumberContract')) + 1;
 				
@@ -820,8 +820,37 @@ public class ContractHomeManager
     ********************************************************************************/
 	public static void fillSpecificVATNumber(List<Contract_Home__c> recordList)
 	{
+		//Set<Id> chIds = new Set<Id>();
+
+		//Account account = new Account([SELECT Id,  Official_Country__c, Official_PostalCode__c FROM Account WHERE Id IN :chIds]);
+
 		for(Contract_Home__c ch : recordList)
 		{
+/* 			Account acc = new Account(Id= account.id);
+			if(acc.Official_Country__c=='FRA')
+			{
+				if(LEFT(acc.Official_PostalCode__c,3)=-'973' || LEFT(acc.Official_PostalCode__c,3)=='976' )
+				{
+					ch.Specific_VAT_Picklist__c ='0.00%';
+				}
+				else if(LEFT(acc.Official_PostalCode__c,3)=='971' || LEFT(acc.Official_PostalCode__c,3)=='972' || 
+						LEFT(acc.Official_PostalCode__c,3)=='975') //???? || LEFT(acc.Official_PostalCode__c,3)='976')
+				{
+					ch.Specific_VAT_Picklist__c ='8.50%';
+					
+				}
+				else
+				{
+					ch.Specific_VAT_Picklist__c ='20.00%';
+
+				}
+			}
+			else if(acc.Official_Country__c=='BEL')
+			{
+				ch.Specific_VAT_Picklist__c ='0.00%';
+
+			} */
+
 			if(ch.Specific_VAT_Picklist__c !=null)
 			{
 				Integer result = ch.Specific_VAT_Picklist__c.indexOf('%');

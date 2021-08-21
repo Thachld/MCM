@@ -55,18 +55,19 @@ public class ServiceAppointmentManager
 
 
     //Novera- QLE Zip Code is a custom object in Salesforce
-    public static Map<String,Id> ZipCodePerIdMap{ 
+    public static Map<String,Id> ZipCodeIdPerNameMap{ 
         get{
-            if(ZipCodePerIdMap==null)
+            if(ZipCodeIdPerNameMap==null)
             {
                 Map<String,Id> zipCodeMap = new Map<String,Id>();
                 for(Zip_Code__c zc : [SELECT Id, Name FROM Zip_Code__c WHERE Name!=null])
                 {
                     zipCodeMap.put(zc.Name,zc.Id);
                 }
-                ZipCodePerIdMap=ZipCodeMap;
+                ZipCodeIdPerNameMap=ZipCodeMap;
+                system.debug('AMUzipmap' +ZipCodeIdPerNameMap);
             }
-            return ZipCodePerIdMap;
+            return ZipCodeIdPerNameMap;
         }
         set;
     }
@@ -319,7 +320,7 @@ public class ServiceAppointmentManager
 
             for(ServiceAppointment sa : saToProcessForInvoice.values())
             {       
-                //try{
+                try{
                     Map<Id,Decimal> pricePerServId = pricePerServIdPerCtrId.get(sa.Contract_Home__c); 
 
                     if(pricePerServId==null || pricePerServId.isEmpty())
@@ -374,22 +375,22 @@ public class ServiceAppointmentManager
                     {
                         saliListToInsert.addAll(miscellaneousInvoicing(sa,servicePerVisitTypeMapFR,false));                                                                  
                     }
-                // }
-                // catch(Exception e)
-                // {
-                //     saliListToInsert = new List<Service_Appointment_Line_Item__c>(); 
-                //     String message = '';
-                //     if(e.getMessage().contains(Label.CanNotFindServiceInPricing) || e.getMessage().contains(Label.CanNotFindPriceInContract))
-                //     {
-                //            message = e.getMessage();
-                //     } 
-                //     else
-                //     {
-                //         message = Label.Error_system_Invoicing +' '+ e.getMessage();
-                //     }
-                //     errorTaskToInsert.add(generateTaskMCMQueue(sa.OwnerId,null,sa.Id,Label.ErrorDuringInvoiceDetailLines, message,1));
-                //     saInvoicingStatus.put(sa.Id,'E');  
-                // }
+                }
+                catch(Exception e)
+                {
+                    saliListToInsert = new List<Service_Appointment_Line_Item__c>(); 
+                    String message = '';
+                    if(e.getMessage().contains(Label.CanNotFindServiceInPricing) || e.getMessage().contains(Label.CanNotFindPriceInContract))
+                    {
+                           message = e.getMessage();
+                    } 
+                    else
+                    {
+                        message = Label.Error_system_Invoicing +' '+ e.getMessage();
+                    }
+                    errorTaskToInsert.add(generateTaskMCMQueue(sa.OwnerId,null,sa.Id,Label.ErrorDuringInvoiceDetailLines, message,1));
+                    saInvoicingStatus.put(sa.Id,'E');  
+                }
             }
             if(!saliListToInsert.isEmpty())
             {
@@ -921,12 +922,45 @@ public class ServiceAppointmentManager
     {
         for(ServiceAppointment sa : recordList)
         {
-            if(sa.PostalCode!=null && sa.PostalCode!=oldMap.get(sa.Id).PostalCode)
+            if(oldMap!=null)
             {
-                sa.Zip_Code__c = ZipCodePerIdMap.containsKey(sa.PostalCode)?ZipCodePerIdMap.get(sa.PostalCode):null;
+                if(sa.PostalCode!=null && sa.PostalCode!=oldMap.get(sa.Id).PostalCode)
+                {
+                    sa.Zip_Code__c = ZipCodeIdPerNameMap.containsKey(sa.PostalCode)?ZipCodeIdPerNameMap.get(sa.PostalCode):null;
+                }
+            }
+            else
+            {
+                Map<Id,String> saZipCodeMap =  new Map<Id,String>(); 
+                if(sa.PostalCode!=null)
+                {
+                    saZipCodeMap.put(sa.Id,sa.PostalCode);
+                }
+                if(!saZipCodeMap.isEmpty()) updateZipCode(saZipCodeMap); 
             }
         }
     }
+
+    /*******************************************************************************
+    * @author       Novera - QLE
+    * @date         2020-12-03
+    * @description  
+    * @param        
+    * @return       
+    ********************************************************************************/
+    @future
+    public static void updateZipCode(Map<Id,String> saZipCodeMap)
+    {
+        List<ServiceAppointment> saList = new List<ServiceAppointment>();
+        for(Id saId : saZipCodeMap.keySet())
+        {
+            ServiceAppointment sa = new ServiceAppointment(Id=saId,Zip_Code__c= ZipCodeIdPerNameMap.get(saZipCodeMap.get(saId)));
+            saList.add(sa);
+        }
+        update saList;
+    }
+
+
 
     /*******************************************************************************
     * @author       Novera - QLE
@@ -1269,10 +1303,8 @@ public class ServiceAppointmentManager
                                                                     , Absence_Registration__r.Type__c
                                                                     , Absence_Registration__r.Doctor_Firstname__c
                                                                     , Absence_Registration__r.Doctor_Name__c
-                                                                    , Employee__c
-                                                                    , AccountId
-                                                                    , Account.HR_responsible__c
-                                                                    , Account.Parent__c
+                                                                    , Employee__c, AccountId
+                                                                    , Account.HR_responsible__c, Account.Parent__c
                                                                     , Account.Maximum_Distance_for_Convocation__c
                                                                     , Account.Parent__r.Maximum_Distance_for_Convocation__c
                                                                     , Account.Maximum_distance_for_home_visits__c
@@ -1285,16 +1317,14 @@ public class ServiceAppointmentManager
                                                                     , Absence_Registration__r.Appointment_will_be_made_by__c    
                                                                     , Absence_Registration__r.Visit_Type__c    
                                                                     , Absence_Registration__r.Start_date_disease__c    
-                                                                    , Share_to_MCM_FR__c
-                                                                    , Share_to_MCM_BE__c
-                                                                    , EndDate
+                                                                    , Share_to_MCM_FR__c, Share_to_MCM_BE__c, EndDate
+                                                                    , Optimal_First_Day__c, Optimal_Last_Day__c
                                                             FROM WorkOrder
                                                             WHERE Id IN :workOrderIds]);
       
         
         for (ServiceAppointment sa : recordList)
         {
-            sa.Zip_Code__c = ZipCodePerIdMap.containsKey(sa.PostalCode)?ZipCodePerIdMap.get(sa.PostalCode):null;
             if(woByIdMap.containsKey(sa.ParentRecordId))
             {
                 WorkOrder wo = woByIdMap.get(sa.ParentRecordId);
@@ -1302,13 +1332,13 @@ public class ServiceAppointmentManager
                 sa.Account_Tech__c = wo.AccountId;
                 sa.Certificate_Start_Date__c = wo.Absence_Registration__r.Certificate_Start_Date__c;
                 sa.Certificate_End_Date__c = wo.Absence_Registration__r.Certificate_End_Date__c;
-                sa.EarliestStartTime = wo.Absence_Registration__r.Request_Date_and_Time__c;
+                sa.EarliestStartTime = wo.Optimal_First_Day__c!=null?wo.Optimal_First_Day__c:wo.Absence_Registration__r.Request_Date_and_Time__c;
+                sa.DueDate = wo.Optimal_Last_Day__c!=null?wo.Optimal_Last_Day__c:wo.EndDate;
                 sa.Exit_home_authorized__c= wo.Absence_Registration__r.Exit_home_authorized__c;              
                 sa.Start_Date__c = wo.Absence_Registration__r.Start_date__c;
                 sa.Type_of_visit_requested__c = wo.Absence_Registration__r.Type_of_visit_requested__c;
                 sa.Notification_channel__c = wo.Absence_Registration__r.Notification_channel__c;
                 sa.Appointment_will_be_made_by__c = wo.Absence_Registration__r.Appointment_will_be_made_by__c;
-                sa.DueDate = wo.EndDate;
                 sa.Presumed_End_Date__c = wo.Absence_Registration__r.End_date__c;
                 sa.Type__c = wo.Absence_Registration__r.Type__c;
                 sa.Visit_Type__c= wo.Absence_Registration__r.Visit_Type__c;
@@ -1323,11 +1353,8 @@ public class ServiceAppointmentManager
                 sa.Absence_Registration__c = wo.Absence_Registration__c;
                 sa.Employee__c = wo.Employee__c;
                 if( wo.Account.HR_responsible__c != null)
-                system.debug( 'AMU wo.Account.HR_responsible__c' +  wo.Account.HR_responsible__c);
                 {
                     sa.HR_responsible__c = wo.Account.HR_responsible__c;
-                system.debug( 'AMU sa.HR_responsible__c' +  sa.HR_responsible__c);
-
                 }
                 if( wo.Account.HR_responsible__c == null && Account.Parent__r.HR_responsible__c != null ){
                     sa.HR_responsible__c = wo.Account.Parent__r.HR_responsible__c;
@@ -1544,7 +1571,7 @@ public class ServiceAppointmentManager
                 switch on csli.Service__r.Service_Category__c {
                     when 'Basic fee per service' {
                         switch on csli.Service__r.Visit_Type__c {
-                            when 'Home Visit' {
+                            when 'Home visit' {
                                 ctr.csliBasicFeeHomeVisit = cslitem;
                             }
                             when 'Convocation' {
@@ -1588,7 +1615,14 @@ public class ServiceAppointmentManager
                 for(Id saId : notAssignedSA)
                 {
                     ServiceAppointment sa = servApptPerContractHomeIdMap.get(ctr.ctrId).get(saId);
-                    sa.Contractual_Service_Line_Item__c = sa.Home_Visit__c==true?ctr.csliBasicFeeHomeVisit.cslitemId:sa.Convocation__c==true?ctr.csliBasicFeeConvocation.cslitemId:null;
+                    if(sa.Home_Visit__c && ctr.csliBasicFeeHomeVisit!=null) 
+                    {
+                        sa.Contractual_Service_Line_Item__c = ctr.csliBasicFeeHomeVisit.cslitemId;
+                    }
+                    else if(sa.Convocation__c && ctr.csliBasicFeeConvocation!=null)
+                    {
+                        sa.Contractual_Service_Line_Item__c = ctr.csliBasicFeeConvocation.cslitemId;
+                    }
                     tasks.add(generateTaskMCMQueue(sa.OwnerId,null,sa.Id,Label.CustomerPack0 ,Label.LastServiceOfPackIsUsed,AbsenceRegistrationManager.TASK_DELAY));
                 }
             }
