@@ -323,7 +323,7 @@ public class ContractHomeManager
 	public static void createDefaultContractLines(List<Contract_Home__c> recordList)
 	{
 		Set<Id> pbIdSet = new Set<Id>();
-		Map<Id,Map<Id,Decimal>> pricePerServiceIdPerPbId = new Map<Id,Map<Id,Decimal>>();
+		Map<Id,Map<Id,Contractual_Service_Line_Item__c>> pricePerServiceIdPerPbId = new Map<Id,Map<Id,Contractual_Service_Line_Item__c>>();
 		Map<Id, Contract_Home__c> ctrHomeperPbId = new Map<Id, Contract_Home__c>();
 		for(Contract_Home__c ctr : recordList)
 		{
@@ -331,18 +331,26 @@ public class ContractHomeManager
 		}
 		if(!ctrHomeperPbId.isEmpty())
 		{
-			for(Contract_Home__c pb : [SELECT Id, (SELECT Service__c, Price_Rate_1__c, Contract_Home__c FROM Contractual_Service_Line_Items__r) FROM Contract_Home__c WHERE Id IN:ctrHomeperPbId.KeySet()])
+			for(Contract_Home__c pb : [SELECT Id, (SELECT Service__c, Price_Rate_1__c, Supplement__c, Contract_Home__c FROM Contractual_Service_Line_Items__r) FROM Contract_Home__c WHERE Id IN:ctrHomeperPbId.KeySet()])
 			{
-				Map<Id,Decimal> pricePerServiceId = new Map<Id,Decimal>();
+				Map<Id,Contractual_Service_Line_Item__c> pricePerServiceId = new Map<Id,Contractual_Service_Line_Item__c>();
 				for(Contractual_Service_Line_Item__c pbLine : pb.Contractual_Service_Line_Items__r)
 				{
-					if( ctrHomeperPbId.containsKey(pbline.Contract_Home__c) && pbLine.Price_Rate_1__c == null)
+					Contract_Home__c currentCtr = ctrHomeperPbId.get(pb.Id);
+					if(pbLine.Price_Rate_1__c != null || pbLine.Supplement__c != null)
 					{
-						Contract_Home__c currentCtr = ctrHomeperPbId.get(pb.Id);
-						currentCtr.addError(Label.Invoicing_Error_Price_Line);
+						pricePerServiceId.put(pbLine.Service__c, pbLine);
 					}
-					else {
-						pricePerServiceId.put(pbLine.Service__c, pbLine.Price_Rate_1__c);
+					else 
+					{
+                        if(currentCtr.RecordTypeId==mcmRtFRId && pbLine.Price_Rate_1__c == null)
+						{
+							currentCtr.addError(Label.Invoicing_Error_Price_Line);
+						}
+						else if(currentCtr.RecordTypeId==mcmRtBEId && pbLine.Price_Rate_1__c == null && pbLine.Supplement__c == null)
+						{
+                            currentCtr.addError(Label.Invoicing_Error_Price_Line); 
+						}
 					}
 				}
 				pricePerServiceIdPerPbId.put(pb.Id,pricePerServiceId);
@@ -353,12 +361,13 @@ public class ContractHomeManager
 			{
 				if(ctr.Pricing__c!=null && ctr.Version__c==1 && ctr.Is_From_Migration__c==false)
 				{
-					Map<Id,Decimal> pricePerServiceId = pricePerServiceIdPerPbId!=null?pricePerServiceIdPerPbId.get(ctr.Pricing__c):null;
+					Map<Id,Contractual_Service_Line_Item__c> pricePerServiceId = pricePerServiceIdPerPbId!=null?pricePerServiceIdPerPbId.get(ctr.Pricing__c):null;
 					for(Id sId : pricePerServiceId.keySet())
 					{
 						cslisToInsert.add(new Contractual_Service_Line_Item__c( Contract_Home__c = ctr.Id
 						, Service__c = sId
-						, Price_Rate_1__c = pricePerServiceId.get(sId)
+						, Price_Rate_1__c = pricePerServiceId.get(sId).Price_Rate_1__c
+						, Supplement__c = pricePerServiceId.get(sId).Supplement__c
 						, RecordTypeId = UtilsConstants.RT_ID_CSLI_RT_MCM_Contract_Service));
 					}
 				}
@@ -497,7 +506,11 @@ public class ContractHomeManager
 					}
 					if(currentServiceTypes.removeAll(existingServiceTypes))
 					{
-						if(onWhat=='on insert') currentCtr.addError(Label.ActiveContractSameServiceType);
+						if(onWhat=='on insert')
+						{
+							if(currentCtr.RecordTypeId==mcmRtOneshotBeId) currentCtr.addError(Label.ActiveContractOneShot);
+							else currentCtr.addError(Label.ActiveContractSameServiceType);
+						}
 						else if(onWhat=='on update') currentCtr.addError(Label.ActiveContractSameServiceTypeSpecifContract);
 					}
 					else {
