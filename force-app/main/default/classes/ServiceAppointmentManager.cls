@@ -52,6 +52,13 @@ public class ServiceAppointmentManager
     public static final String SERVICE_IDENTIFICATOR_SMS = 'SMS';
     public static final String SERVICE_IDENTIFICATOR_MISC = 'Miscellaneous';
 
+    public static final String WORKYPE_FR_HV = 'Visite à domicile sans convocation';
+    public static final String WORKYPE_FR_HV_Conv = 'Visite à domicile avec convocation potentielle';
+    public static final String WORKYPE_FR_CONV_HV = 'Convocation après visite à domicile';
+    public static final String WORKYPE_FR_CONV = 'Convocation directe';
+    public static final String WORKYPE_FR_ARBITRAGE = 'Arbitrage';
+    public static final String WORKYPE_FR_EXPERTISE = 'Expertise';
+
 
 
     //Novera- QLE Zip Code is a custom object in Salesforce
@@ -1304,6 +1311,7 @@ public class ServiceAppointmentManager
                                                                     , Absence_Registration__r.Doctor_Firstname__c
                                                                     , Absence_Registration__r.Doctor_Name__c
                                                                     , Employee__c, AccountId
+                                                                    , Employee__r.Name
                                                                     , Account.HR_responsible__c, Account.Parent__c
                                                                     , Account.Maximum_Distance_for_Convocation__c
                                                                     , Account.Parent__r.Maximum_Distance_for_Convocation__c
@@ -1319,6 +1327,7 @@ public class ServiceAppointmentManager
                                                                     , Absence_Registration__r.Start_date_disease__c    
                                                                     , Share_to_MCM_FR__c, Share_to_MCM_BE__c, EndDate
                                                                     , Optimal_First_Day__c, Optimal_Last_Day__c
+                                                                    , City, Work_Type_FR__c, PostalCode
                                                             FROM WorkOrder
                                                             WHERE Id IN :workOrderIds]);
       
@@ -1345,6 +1354,24 @@ public class ServiceAppointmentManager
                 sa.Start_date_disease__c= wo.Absence_Registration__r.Start_date_disease__c;
                 sa.Share_to_MCM_FR__c = wo.Share_to_MCM_FR__c;
                 sa.Share_to_MCM_BE__c = wo.Share_to_MCM_BE__c;
+                sa.City_searchable__c= wo.city!=null?wo.city:'';
+                sa.Employee_searchable__c= wo.Employee__r.Name!=null?wo.Employee__r.Name:'';
+                sa.Zip_Code_searchable__c = wo.PostalCode!=null?wo.PostalCode:'';
+                if(wo.work_Type_FR__c == WORKYPE_FR_HV ||wo.work_Type_FR__c ==WORKYPE_FR_HV_CONV)
+                {
+                    sa.Request_type_searchable__c = 'Home visit';
+                }
+                else if(wo.work_Type_FR__c == WORKYPE_FR_CONV || wo.work_Type_FR__c == WORKYPE_FR_CONV_HV )
+                {
+                    sa.Request_type_searchable__c = 'Convocation';
+                }
+                else if(wo.work_Type_FR__c == WORKYPE_FR_ARBITRAGE) 
+                {
+                    sa.Request_type_searchable__c = 'Arbitrage';
+                }
+                else if(wo.work_Type_FR__c == WORKYPE_FR_EXPERTISE) {
+                    sa.Request_type_searchable__c = 'Expertise';
+                }
                 String docFirstName= wo.Absence_Registration__r.Doctor_Firstname__c==null?'':wo.Absence_Registration__r.Doctor_Firstname__c;
                 String docName= wo.Absence_Registration__r.Doctor_Name__c==null?'':wo.Absence_Registration__r.Doctor_Name__c;
                 {
@@ -1702,6 +1729,96 @@ public class ServiceAppointmentManager
             for(serviceAppointment sa: saToProcess)
             {
                 if(saWithAssignedRessource==null || ( saWithAssignedRessource!=null&& !saWithAssignedRessource.contains(sa.id))) sa.addError('Status cannot be changed to Scheduled: a service resource needs to be assigned');
+            }
+        }
+    }
+
+/*******************************************************************************
+    * @author       Novera - AMU
+    * @date         2020-02-15
+    * @description  OAPPMEDCHECK 178- Notify customer of a resource assigned by email
+    * @param        
+    * @return       
+    ********************************************************************************/
+    public static void sendIntermediaryChangeAssignedResource(List<ServiceAppointment> recordList, Map<Id, ServiceAppointment> recordOldValueMap)
+    {
+        Set<Id> setAbsenceIds = new Set<Id>();
+        Id saId;
+        Id absenceId;
+        ID absenceOwnerId;
+        String absenceRT;
+        List <Recipients_Absence_Query.flowInputs> lstInputs = new List <Recipients_Absence_Query.flowInputs>();
+
+        for(ServiceAppointment sa : recordList)
+        {   
+            if(sa.status == 'Scheduled' && recordOldValueMap.get(sa.Id).Status != 'Scheduled' )
+            {
+                setAbsenceIds.add(sa.Absence_Registration__c);
+                saId = sa.Id;
+            }
+        }
+
+        if(!setAbsenceIds.isEmpty()) //sa?
+        { 
+            //Get the list of absences ids in the SA records
+            Map<Id, Absence_Registration__c> absencesByIdMap = new Map<Id, Absence_Registration__c>([SELECT Id, Account__c, Main_Account__c, 
+                                                                                                            OwnerId, RecordType.DeveloperName, Result_Code__c
+                                                                                                    FROM Absence_Registration__c
+                                                                                                    WHERE Id IN :setAbsenceIds]);
+            System.debug('absencesByIdMap:' +absencesByIdMap);
+
+            //If the absences list is not empty, send parameters to the apex query recipients class
+            if(!absencesByIdMap.isEmpty()){
+                for (Absence_Registration__c abs : absencesByIdMap.values()) 
+                {
+                    Recipients_Absence_Query.flowInputs Inputs = new Recipients_Absence_Query.flowInputs();
+                        Inputs.absenceAccountId = abs.Account__c;
+                        Inputs.mainAccountId    = abs.Main_Account__c;
+                        absenceId               = abs.id;
+                        absenceOwnerId          = abs.OwnerId;
+                        absenceRT               = abs.RecordType.DeveloperName;
+                    lstInputs.add(Inputs);
+                }
+            }
+
+            List<Task> alertTasks = new List<Task>();
+            Map<Id, Contact> mapRecipients = new Map<Id, Contact>();
+                
+                
+            //Collect the contact recipients lists output
+            List <Recipients_Absence_Query.Response> Responses = Recipients_Absence_Query.retrieveInputs(lstInputs);
+                    
+            for(Recipients_Absence_Query.Response res: Responses){
+                if(absenceRT == 'MCM_BE' && !res.AssignedResource_Recipients.isEmpty())
+                {
+                    mapRecipients.putall(res.AssignedResource_Recipients);
+                }          
+            }
+
+            //Update the contact to trigger email alert
+            if(mapRecipients.size() > 0) {
+                for(contact con : mapRecipients.values()) {
+                    con.TECH_Notify_employer_assignedResource__c = true;
+                    con.Tech_Related_To__c = saId; //should be the sa id or the absence id?
+                }
+                        
+                update mapRecipients.values();
+                System.debug('updated emailRecipients:' +mapRecipients.values());
+            }
+            
+            else if(mapRecipients.size() == 0) {
+                Task myTask = new Task();
+                    myTask.ActivityDate = System.today();
+                    myTask.subject     = System.Label.Flow_No_Recipents_Found;
+                    myTask.Description = System.Label.Flow_No_Recipents_Found;
+                    myTask.OwnerId     = absenceOwnerId;
+                    myTask.Status      = 'Open';
+                    myTask.WhatId      = absenceId; //sa ou absence?
+                
+                alertTasks.add(myTask);                
+            }
+            if(alertTasks.size() > 0) {
+                insert alertTasks;             
             }
         }
     }
