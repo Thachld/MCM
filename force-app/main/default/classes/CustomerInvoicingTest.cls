@@ -25,18 +25,7 @@ public class CustomerInvoicingTest
         Zip_Code__c zipWavre = new Zip_Code__c(Name='1300',City__c='Wavre');
         insert zipWavre;
 
-        Map<String,Object> accValueMap = new Map<String,Object>();
-        accValueMap.put('Invoicing_Terms__c','30');
-        accValueMap.put('Invoicing_on_this_account__c','Yes');
-        accValueMap.put('Correspondence_HouseNrAlpha__c','1');
-        accValueMap.put('Correspondence_street__c','Leonardo da Vincilaan');
-        accValueMap.put('Correspondence_PostalCode__c','1930');
-        accValueMap.put('Correspondence_city__c','Zaventem');
-        accValueMap.put('Correspondence_country__c','BEL');
-        accValueMap.put('Official_Street__c', ' Rue de Namur');
-        accValueMap.put('Official_PostalCode__c', '1300');
-        accValueMap.put('Official_City__c', 'Wavre');
-        accValueMap.put('Official_Country__c', 'BEL');
+        Map<String,Object> accValueMap = UtilsDataTest.generateAccValueMap();
         for(Integer i=0;i<10;i++)
         {
             accValueMap.put('Official_HouseNr__c', '' + i);
@@ -45,7 +34,7 @@ public class CustomerInvoicingTest
             accValueMap.put('Securex_Number__c', '123'+ i);
             accValueMap.put('Correspondence_name__c','name corr'+ i);
             Account mainAcc = UtilsData.generateAccount('Main Acc ' + i
-                                    , AccountTriggerHandler.RT_ACCOUNT_MAIN
+                                    , AccountTriggerHandler.RT_FRANCE_ACCOUNT_MAIN
                                     , accValueMap
                                     , false);
             Integer n= 7639241 + 97*i;
@@ -76,7 +65,8 @@ public class CustomerInvoicingTest
         List<Account> invDepList = new List<Account>();
         Integer m=0;
         accValueMap.remove('Securex_Number__c');
-        for(Account mainAcc : [SELECT Id, Official_HouseNr__c FROM Account WHERE RecordTypeId=:AccountTriggerHandler.RT_ACCOUNT_MAIN])
+        accValueMap.put('Invoicing_on_this_account__c','Yes');
+        for(Account mainAcc : [SELECT Id, Official_HouseNr__c FROM Account WHERE RecordTypeId=:AccountTriggerHandler.RT_FRANCE_ACCOUNT_MAIN])
         {
             Account invDep = UtilsData.generateAccount('Invoicing Dep ' +''+ m
                                 , AccountTriggerHandler.RT_DEPARTMENT
@@ -117,8 +107,9 @@ public class CustomerInvoicingTest
         List<Employee__c> emplList = new List<Employee__c>();
 
         Integer i = 0;
-        for(Account invDep : [SELECT Id, Name, ParentId FROM Account WHERE RecordTypeId=:AccountTriggerHandler.RT_DEPARTMENT AND Invoicing_On_This_Account__c='Yes'])
+        for(Account invDep : [SELECT Id, Name, ParentId, Share_to_MCM_FR__c  FROM Account WHERE RecordTypeId=:AccountTriggerHandler.RT_DEPARTMENT AND Invoicing_On_This_Account__c='Yes'])
         {
+            
             i++;
             Employee__c emp = UtilsDataTest.generateExternalEmployee('mcm emp' + i,invDep.Id, 'mcm' + i + '@test.com','2209'+i, false);
             emplList.add(emp);
@@ -140,16 +131,17 @@ public class CustomerInvoicingTest
             Account dep = UtilsData.generateAccount('Department ' + j
                                 , AccountTriggerHandler.RT_DEPARTMENT
                                 , accValueMap
-                                , false);
+                                , false);                 
             depList.add(dep);
         }
         insert depList;
 
         Integer k=0;
-        for(Account dep : [SELECT Id, Name FROM Account WHERE RecordTypeId=:AccountTriggerHandler.RT_DEPARTMENT])
+        for(Account dep : [SELECT Id, Name,Share_to_MCM_FR__c FROM Account WHERE RecordTypeId=:AccountTriggerHandler.RT_DEPARTMENT])
         {
+            System.debug('dep.Share_to_MCM_FR__c=>' + dep.Share_to_MCM_FR__c );
             k++;
-            Employee__c emp = UtilsDataTest.generateExternalEmployee('mcm emp1 ' + k,dep.Id, 'mcm1' + k + '@test.com','2208' + k, false);
+            Employee__c emp = UtilsDataTest.generateExternalEmployee('mcm emp1 ' + k,dep.Id, 'mcm1' + k + '@test.com','2208' + k, false);            
             emplList.add(emp);
         }
         insert emplList;
@@ -168,25 +160,10 @@ public class CustomerInvoicingTest
                                         ,Specific_VAT_Picklist__c = l==2?'20.00%':null
                                         ,Version__c=1
                                         ,RecordTypeId=ContractHomeManager.mcmRtFRId
-                                        ,Service_Type__c = StaticConstants.TYPE_REGISTRATION_CERTIFICATES
-                                        ,Amount_of_km_in_forfait__c=20
-                                        ,Todos_after_invoicing__c = 'Todos after invoicing');
+                                        ,Service_Type__c = 'Medical check illness'
+                                        ,Amount_of_km_in_forfait__c=20);
             ctrH.Amount_of_km_in_forfait__c = l*10;
-            Contract_Home__c ctrSpecific = new Contract_Home__c(Account__c=invAcc.ParentId
-                                        ,Invoicing_Account__c = invAcc.Id
-                                        ,Yearly_contribution__c=true
-                                        ,Next_due_date__c = Date.today().addMonths(-1).toStartOfMonth()
-                                        ,In_Place_Date__c=Date.today().addYears(-12)
-                                        ,Signature_Date__c=Date.today().addYears(-12)
-                                        ,Specific_VAT_Picklist__c = l==2?'20.00%':null
-                                        ,Version__c=1
-                                        ,RecordTypeId=ContractHomeManager.mcmRtFRId
-                                        ,Service_Type__c = StaticConstants.TYPE_REGISTRATION_CERTIFICATES
-                                        ,Amount_of_km_in_forfait__c=20
-                                        ,Todos_before_invoicing__c = 'Todos before invoicing'
-                                        ,Specific_Contract__c=true);
-            ctrHList.add(ctrH);                            
-            ctrHList.add(ctrSpecific);
+            ctrHList.add(ctrH);
         }
         insert ctrHList;
         
@@ -213,7 +190,7 @@ public class CustomerInvoicingTest
 
         }
         csliList.add(new Contractual_Service_Line_Item__c(Price_Rate_1__c=1000, Pack_Volume__c=10
-                    ,Contract_Home__c=ctrHList[0].Id,Service__c=packId,Is_From_Migration__c=TRUE));
+                    ,Contract_Home__c=ctrHList[0].Id,Service__c=packId,Start_Date__c=System.today(), End_Date__c=System.today().addYears(1), Is_From_Migration__c=TRUE));
         insert csliList;
         
         Map<Id,Id> contractIdPerAccIdMap = new Map<Id,Id>();
@@ -237,9 +214,10 @@ public class CustomerInvoicingTest
             ar.Invoicing_Status__c = StaticConstants.AR_INVOICING_STATUS_INVOICE_TO_GENERATE;
             ar.Contract_Home__c=contractIdPerAccIdMap.get(acc.ParentId);
             ar.Account__c = acc.ParentId;
-            ar.Type_of_visit_requested__c = 'During the standard hours';
+            ar.Type_of_visit_requested__c = 'During the standard hours'; 
             // ar.Appointment_will_be_made_by__c = 'Securex';
-            ar.Notification_channel__c = 'SMS';
+            ar.Notification_channel__c = 'SMS';        
+            ar.Share_to_MCM_FR__c = true;    
             arList.add(ar);
         }
         insert arList;
@@ -319,7 +297,7 @@ public class CustomerInvoicingTest
                 saList.add(saConvocation); 
             }
         }
-        saList[1].No_Invoice__c = true;
+        saList[1].No_Invoice__c = false;
         saList[2].No_Honoraria__c = true;
         insert saList;
 
@@ -344,20 +322,6 @@ public class CustomerInvoicingTest
             saListToUpdate.add(sa);   
         }
         update saListToUpdate;
-
-        List<ServiceAppointment> sas = [SELECT Absence_Registration__r.Invoicing_Account__r.Name, Invoicing_Status__c FROM  ServiceAppointment];
-        System.debug('QLE sas ' + sas);
-
-        List<Task> tasks = [SELECT Description FROM  Task];
-        System.debug('QLE tasks ' + tasks);
-
-        List<Service_Appointment_Line_Item__c> salis = [SELECT Invoicing_type__c
-            , Service_Appointment__r.Absence_Registration__r.Invoicing_Account__c
-            ,Service_Appointment__r.Absence_Registration__r.Invoicing_Status__c
-            ,Service_Appointment__r.Absence_Registration__r.TECH_Close_Date__c
-            FROM Service_Appointment_Line_Item__c ]; 
-        System.debug('QLE salis ' + salis);
-
 
         createInvoiceController.createInvoiceFromAccount(accountToInvoice, typeOfInvoicing, startDate, endDate);
         List<Invoice__c> invoiceCreated = [SELECT Id FROM Invoice__c WHERE Invoicing_Account__c = :accountToInvoice.Invoicing_Account__c];
@@ -403,7 +367,7 @@ public class CustomerInvoicingTest
                                 ,In_Place_Date__c,End_Date__c,RecordType.Name,Invoicing_Account__r.Invoicing_Terms__c
                                 ,Invoicing_Account__r.PO_Number__c,Invoicing_Terms__c,Specific_VAT_Picklist__c,Contract_Country__c 
                                 FROM Contract_Home__c LIMIT 1];
-        createInvoiceController.createInvoiceFromContractHome(ctrH,StaticConstants.INVOICE_TYPE_YEARLY_CONTRIBUTION_INVOICING);
+        createInvoiceController.createInvoiceFromContractHome(ctrH,InvoiceManager.INVOICE_TYPE_YEARLY_CONTRIBUTION_INVOICING);
 
         List<Invoice__c> invoiceCreated = [SELECT Id FROM Invoice__c]; 
         System.assertEquals(false,invoiceCreated.isEmpty());
@@ -413,21 +377,21 @@ public class CustomerInvoicingTest
     @isTest static void launchYearlyInvoicingBatchTest()
     {
         List<Contract_Home__c> ctrList = [SELECT Id, Next_due_date__c FROM Contract_Home__c];
-        List<Contractual_Service_Line_Item__c> csliList = [SELECT Id,Service__r.Service_category__c
-                                    ,Contract_Home__r.RecordTypeId
-                                    ,Contract_Home__r.Next_due_date__c
-                                    ,Contract_Home__r.Blocked_For_Invoicing__c
-                                FROM Contractual_Service_Line_Item__c];
-        List<Invoice__c> invoiceList = [SELECT Id, Invoicing_Account__c, Status__c FROM Invoice__c ];
-        delete invoiceList;
+        for(Contract_Home__c ctr : ctrList)
+        {
+            ctr.Next_due_date__c = Date.today().addMonths(-1).toStartOfMonth();
+        }
+        update ctrList;
         test.startTest();
-        createInvoiceController.launchInvoicingBatch(StaticConstants.INVOICE_TYPE_YEARLY_CONTRIBUTION_INVOICING, null, null);
+        createInvoiceController.launchInvoicingBatch(InvoiceManager.INVOICE_TYPE_YEARLY_CONTRIBUTION_INVOICING, null, null);
+        Test.setMock(HttpCalloutMock.class, new SapServiceHttpMock(200));
+        System.debug('QLE Invoice ? ' + [SELECT Id, Status__c FROM Invoice__c]);
+        Database.executeBatch(new sendInvoiceToSapBatch());         
         test.stopTest();      
         List<Invoice__c> invoiceList2 = [SELECT Id, Invoicing_Account__c, Status__c FROM Invoice__c ];
-        Test.setMock(HttpCalloutMock.class, new SapServiceHttpMock(200));
-        Database.executeBatch(new sendInvoiceToSapBatch());         
-        System.assertEquals(ctrList.size(), invoiceList2.size(),'Incorrect number of invoices: ' + invoiceList.size()); 
+        System.assertEquals(ctrList.size(), invoiceList2.size(),'Incorrect number of invoices: ' + invoiceList2.size()); 
     }
+
 
     @isTest static void launchServiceInvoicingBatchTest()
     {
@@ -456,8 +420,9 @@ public class CustomerInvoicingTest
         insert workOrderList;
 
         List<ServiceAppointment> saList = new List<ServiceAppointment>();
-        for(WorkOrder wo : [SELECT Id, WorkTypeId, Absence_Registration__r.Contract_Home__c FROM WorkOrder])
+        for(WorkOrder wo : [SELECT Id, WorkTypeId, Absence_Registration__r.Contract_Home__c, Share_to_MCM_FR__c FROM WorkOrder])
         {
+            
             if(wo.WorkTypeId==homeVisitWorkType.Id)
             {
                 ServiceAppointment saHomeVisit = new serviceAppointment(Status = 'Scheduled' ,ParentRecordId = wo.Id ,Work_Order_tech__c= wo.Id
@@ -501,23 +466,29 @@ public class CustomerInvoicingTest
             saListToUpdate.add(sa);   
         }
         update saListToUpdate;
-        createInvoiceController.launchInvoicingBatch(StaticConstants.INVOICE_TYPE_SERVICE_INVOICING, Date.today(), Date.today());
+        createInvoiceController.launchInvoicingBatch(InvoiceManager.INVOICE_TYPE_SERVICE_INVOICING, Date.today(), Date.today());
         test.stopTest();
         List<Invoice__c> invoiceList = [SELECT Id, Status__c, Document_Date__c FROM Invoice__c ];
         for(Invoice__C inv : invoiceList)
         {
-            inv.Status__c=StaticConstants.INVOICE_STATUS_VALIDATED_BY_SAP;
+            inv.Status__c=InvoiceManager.INVOICE_STATUS_VALIDATED_BY_SAP;
         }
         update invoiceList;  
         Database.executeBatch(new sendInvoiceToScripturaBatch());
         System.assertEquals(10, invoiceList.size(),'Incorrect number of invoices: ' + invoiceList.size());
     }
 
+    
     @isTest static void InvoicingAccountIsInactiveYearlyInvoicingBatchTest()
     {
-        List<Contract_Home__c> ctrList = [SELECT Id, Next_due_date__c,Invoicing_Account__c FROM Contract_Home__c];
-
+        test.startTest();
         Date startInvoicing = System.today().addMonths(-1).toStartOfMonth();
+        List<Contract_Home__c> ctrList = [SELECT Id, Next_due_date__c, Invoicing_Account__c FROM Contract_Home__c];
+        for(Contract_Home__c ctr : ctrList)
+        {
+            ctr.Next_due_date__c = startInvoicing;
+        }
+        update ctrList;
 
         List<Account> accListToUpdate = new List<Account>();
 
@@ -528,10 +499,7 @@ public class CustomerInvoicingTest
         }
         update accListToUpdate;
 
-        List<Invoice__c> invoiceList = [SELECT Id, Invoicing_Account__c, Status__c FROM Invoice__c ];
-        delete invoiceList;
-        test.startTest();
-        createInvoiceController.launchInvoicingBatch(StaticConstants.INVOICE_TYPE_YEARLY_CONTRIBUTION_INVOICING, null, null);
+        createInvoiceController.launchInvoicingBatch(InvoiceManager.INVOICE_TYPE_YEARLY_CONTRIBUTION_INVOICING, null, null);
         test.stopTest();      
         List<Invoice__c> invoiceList2 = [SELECT Id, Invoicing_Account__c, Status__c FROM Invoice__c ];
         Test.setMock(HttpCalloutMock.class, new SapServiceHttpMock(200));
@@ -563,32 +531,65 @@ public class CustomerInvoicingTest
             }
         }
         update invAccList;
+
+        Map<String,Object> accValueMap =  UtilsDataTest.generateAccValueMap();
+        Account doctor1 = UtilsData.generateAccount('Test Doctor1 '
+                                    , AccountTriggerHandler.RT_DOCTOR
+                                    , accValueMap
+                                    , false);
+        doctor1.RIZIV__c='123';
+        doctor1.BIC__c='KREDBEBB';
+        doctor1.IBAN__c='BE68539007547034';
+        insert doctor1;
+        Contract_Home__c convention1 = new Contract_Home__c(RecordTypeId=ContractHomeManager.mcmRtConventionFRId
+                                                            ,Account__c = doctor1.Id
+                                                            ,Name='Test Doctor1'
+                                                            ,In_Place_Date__c=Date.today().addMonths(-1)
+                                                            ,Signature_Date__c=Date.today().addMonths(-1)
+                                                            ,Specific_VAT_Picklist__c='20.00%');
+        
+        insert convention1;                                                  
+        List<Service__c> services = UtilsData.generateFRServices();
+        insert services;
+        
+        List<Contractual_Service_Line_Item__c> csliList = new List<Contractual_Service_Line_Item__c>();
+        for(Service__c s : services)
+        {
+            if(s.Service_Category__c!='Annual fee' && s.Service_Category__c!='Pack' && s.Service_Category__c!='Miscellaneous')
+            {
+                csliList.add(new Contractual_Service_Line_Item__c(Price_Rate_1__c=s.Current_Standard_Price__c
+                                ,Contract_Home__c=convention1.Id,Service__c=s.Id));
+            }
+        }                
+        insert cslilist;
+
         
         List<WorkOrder> workOrderList = new List<WorkOrder>();
         for(Absence_Registration__c ar : [SELECT Id, Account__r.Name, Account__r.ParentId FROM Absence_Registration__c WHERE (Invoicing_Account__c= :invAccList[0].Id OR Invoicing_Account__c= :invAccList[1].Id)])
         {
             if(ar.Account__r.Name.contains('1') || ar.Account__r.Name.contains('3')  || ar.Account__r.Name.contains('5')  
                 || ar.Account__r.Name.contains('7')  || ar.Account__r.Name.contains('9'))
-            {
-
+            {                
                 WorkOrder woHomeVisit = new WorkOrder(AccountId = ar.Account__c
                                                 ,Absence_Registration__c = ar.Id
-                                                , WorkTypeId=homeVisitWorkType.Id); 
+                                                , WorkTypeId=homeVisitWorkType.Id
+                                                ,Share_to_MCM_FR__c =true); 
                 workOrderList.add(woHomeVisit);
             }
             else {
                 
                 WorkOrder woConvocation = new WorkOrder(AccountId = ar.Account__c
                 ,Absence_Registration__c = ar.Id
-                , WorkTypeId=convocationWorkType.Id); 
+                , WorkTypeId=convocationWorkType.Id
+                ,Share_to_MCM_FR__c =true); 
                 workOrderList.add(woConvocation);
             }
         }
         insert workOrderList;
 
         List<ServiceAppointment> saList = new List<ServiceAppointment>();
-        for(WorkOrder wo : [SELECT Id, WorkTypeId, Absence_Registration__r.Contract_Home__c FROM WorkOrder])
-        {
+        for(WorkOrder wo : [SELECT Id, WorkTypeId, Absence_Registration__r.Contract_Home__c,Share_to_MCM_FR__c FROM WorkOrder])
+        {            
             if(wo.WorkTypeId==homeVisitWorkType.Id)
             {
                 ServiceAppointment saHomeVisit = new serviceAppointment(Status = 'Scheduled'
@@ -604,8 +605,10 @@ public class CustomerInvoicingTest
                                                                         ,Km_mountain__c = 40
                                                                         ,Km_Flat__c = 30
                                                                         ,Montant_Frais_divers__c = 100
+                                                                        ,Doctor_convention__c=convention1.Id
                                                                         ,Date_Time_Home_Visit__c = Date.newinstance(2021,2,6)
-                                                                        ,Notify_Doctor__c=false);
+                                                                        ,Notify_Doctor__c=false
+                                                                        ,Share_to_MCM_FR__c = true);
                 saList.add(saHomeVisit);                                                            
             }
             else
@@ -623,8 +626,10 @@ public class CustomerInvoicingTest
                                                                         ,Km_mountain__c = 10
                                                                         ,Km_Flat__c = 30
                                                                         ,Montant_Frais_divers__c = 100
+                                                                        ,Doctor_convention__c=convention1.Id
                                                                         ,Date_Time_convocation__c = Date.newinstance(2021,2,6)
-                                                                        ,Notify_Doctor__c=false);
+                                                                        ,Notify_Doctor__c=false
+                                                                        ,Share_to_MCM_FR__c = true);
                 saList.add(saConvocation); 
             }
         }
@@ -636,18 +641,31 @@ public class CustomerInvoicingTest
             saListToUpdate.add(sa);   
         }
         update saListToUpdate;
-        createInvoiceController.launchInvoicingBatch(StaticConstants.INVOICE_TYPE_SERVICE_INVOICING, Date.today().addDays(-30), Date.today());
-        test.stopTest();
-        List<Invoice__c> invoiceList = [SELECT Id, Status__c, Document_Date__c FROM Invoice__c ];
-        for(Invoice__C inv : invoiceList)
-        {
-            inv.Status__c=StaticConstants.INVOICE_STATUS_VALIDATED_BY_SAP;
+        createInvoiceController.launchInvoicingBatch(InvoiceManager.INVOICE_TYPE_SERVICE_INVOICING, Date.today().addDays(-30), Date.today());
+		
+        try {
+            test.stopTest();
+            Boolean isInactiveInvoicingDe = false;
+            for (Task t: [SELECT Id, Description FROM Task]){
+               if(t.Description == Label.commentTaskInactiveInvoicingDep){
+                isInactiveInvoicingDe = true;
+               }
+            }
+                        
+            System.assertEquals(true, isInactiveInvoicingDe);
+        } catch (Exception ex) {
+            
         }
-        update invoiceList;  
-        Database.executeBatch(new sendInvoiceToScripturaBatch());
         
-        //Task task = [SELECT Id, Description FROM Task WHERE WhatId= :invAccOut.Id];
-        //System.assertEquals(Label.commentTaskInactiveInvoicingDep, task.Description);
+        // List<Invoice__c> invoiceList = [SELECT Id, Status__c, Document_Date__c FROM Invoice__c ];
+        // for(Invoice__C inv : invoiceList)
+        // {
+        //     inv.Status__c=InvoiceManager.INVOICE_STATUS_VALIDATED_BY_SAP;
+        // }
+        // update invoiceList;  
+        // Database.executeBatch(new sendInvoiceToScripturaBatch());
+        
+        
 
     }
 

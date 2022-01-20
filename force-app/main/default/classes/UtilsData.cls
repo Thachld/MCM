@@ -1,4 +1,15 @@
 public with sharing class UtilsData {
+
+    public static Integer uniqueNumber{
+        get{
+            if(uniqueNumber == null) uniqueNumber = 0;
+            else{
+                uniqueNumber = uniqueNumber + 1;
+            }
+            return uniqueNumber;
+        }
+        set;
+    }
     /*********************************************************************************************************
     * @author        Germain Martinussen
     * @date          2018 Jan 24
@@ -64,7 +75,7 @@ public with sharing class UtilsData {
     }
     public static Contact generateContact(String contactLastName, String recordTypeId, ID accountId, Map<String,Object> fieldnameValueMap, Boolean executeInsert){
         Contact con;
-        con = new Contact(LastName=contactLastName, RecordTypeId=recordTypeId,AccountId = accountId);
+        con = new Contact(LastName=contactLastName, RecordTypeId=recordTypeId,AccountId = accountId,Language__c='FR');
         
         if(fieldnameValueMap!=null){
             for(String fieldName : fieldnameValueMap.keySet()) {
@@ -76,7 +87,7 @@ public with sharing class UtilsData {
         return con;
     }
     public static Contact generateContact(String contactLastName, ID accountId, boolean insertRecord){
-        Contact con = new Contact(LastName=contactLastName, AccountId=accountId);
+        Contact con = new Contact(LastName=contactLastName, AccountId=accountId,Language__c='FR');
         if (insertRecord){
             insert con;
         }
@@ -217,6 +228,13 @@ public with sharing class UtilsData {
         return teamSetting;
     }
 
+    public static Team_Setting__mdt generateTeamSettingsWithCaseCreationEmailTemplate(String QueueId, String teamgroup, String team)
+    {
+        Team_Setting__mdt teamSetting=generateTeamSettings(QueueId,teamgroup,team,null);
+        teamSetting.Case_Creation_Email_template__c	='SEP Confirmation Case Created';
+        return teamSetting;
+    }
+
     public static SLA__c generateSla(Integer firstres, String firstresUnit, Integer closeCase, String closeCaseUnit)
     {
         BusinessHours bhs=[SELECT Id FROM BusinessHours WHERE IsDefault=true LIMIT 1];
@@ -282,7 +300,7 @@ public with sharing class UtilsData {
 
     public static Case_Subtype__c generateCaseSubtype(Id ctId,String ctText, String tg)
     {
-        Case_Subtype__c cSt = new Case_Subtype__c(Name='Test',Case_Type__c=ctId,Case_Type_Text__c=ctText,Team_Group_Text__c=tg); 
+        Case_Subtype__c cSt = new Case_Subtype__c(Name='Test',Case_Type__c=ctId,Case_Type_Text__c=ctText,Team_Group_Text__c=tg, External_Id__c = tg+'_'+ctText+'_test'+uniqueNumber); 
         insert cSt;
         return cSt;
     }
@@ -329,28 +347,138 @@ public with sharing class UtilsData {
         return serv;
     }
 
+    public static Service__c generateMcmFrService(String nameS, String category, String visitType, String suppType,
+                                                Decimal currStandPrice, String glAccWithVAT, String glAccWithoutVAT,
+                                                string docGlVAT, string docGlWithoutVAT, String packtype)
+    {
+        Service__c serv = new Service__c(Name = nameS
+                                        ,Available_for_country__c='FR'
+                                        ,Service_category__c=category
+                                        ,Visit_type__c = visitType
+                                        ,Supplement_Type__c = suppType
+                                        ,Current_Standard_Price__c = currStandPrice
+                                        ,Gl_Account_with_VAT__c = glAccWithVAT
+                                        ,Gl_Account_without_VAT__c = glAccWithoutVAT
+                                        ,Start_Date__c = System.today().addYears(-1)
+                                        ,Doctor_Gl_Account_with_VAT__c    = docGlVAT
+                                        ,Doctor_Gl_Account_without_VAT__c = docGlWithoutVAT
+                                        ,Pack_type__c = packtype
+                                        );
+        return serv;
+    }
+
+    public static Service__c generateMcmBeService(String nameS, String category, String visitType, String suppType,
+                                                Decimal currStandPrice, String glAccWithVAT, String glAccWithoutVAT,
+                                                string docGlVAT, string docGlWithoutVAT)
+    {
+        Service__c serv = new Service__c(Name = nameS
+                                        ,Available_for_country__c='BE'
+                                        ,Service_category__c=category
+                                        ,Visit_type__c = visitType
+                                        ,Supplement_Type__c = suppType
+                                        ,Current_Standard_Price__c = currStandPrice
+                                        ,Gl_Account_with_VAT__c = glAccWithVAT
+                                        ,Gl_Account_without_VAT__c = glAccWithoutVAT
+                                        ,Start_Date__c = System.today().addYears(-1)
+                                        ,Doctor_Gl_Account_with_VAT__c    = docGlVAT
+                                        ,Doctor_Gl_Account_without_VAT__c = docGlWithoutVAT
+                                        );
+        return serv;
+    }
+    
+    public static Service__c generateMcmBeService(String nameS, String category, String visitType, String suppType,
+                                                Decimal currStandPrice, String glAccWithVAT, String glAccWithoutVAT,
+                                                string docGlVAT, string docGlWithoutVAT, String packtype)
+    {
+        Service__c serv = new Service__c(Name = nameS
+                                        ,Available_for_country__c='BE'
+                                        ,Service_category__c=category
+                                        ,Visit_type__c = visitType
+                                        ,Supplement_Type__c = suppType
+                                        ,Current_Standard_Price__c = currStandPrice
+                                        ,Gl_Account_with_VAT__c = glAccWithVAT
+                                        ,Gl_Account_without_VAT__c = glAccWithoutVAT
+                                        ,Start_Date__c = System.today().addYears(-1)
+                                        ,Doctor_Gl_Account_with_VAT__c    = docGlVAT
+                                        ,Doctor_Gl_Account_without_VAT__c = docGlWithoutVAT
+                                        ,Pack_type__c = packtype                                                                                
+                                        );
+        return serv;
+    }
+
+    public static List<Service__c> generateBEServices()
+    {
+        List<Service__c> services = new  List<Service__c>();
+        Service__c convocationService = UtilsData.generateMcmBeService('Convocation','Basic fee per service','Convocation',null,110,'70200000','70200000', '00000000000', '00000000000');
+        services.add(convocationService);
+
+        Service__c homeVisitservice = UtilsData.generateMcmBeService('Home visit','Basic fee per service','Home visit',null,120,'70200000','70200000', '00000000000', '00000000000');
+        services.add(homeVisitservice);
+
+        Service__c OpenDossService = UtilsData.generateMcmBeService('Supplement flat km','Supplement per service',null,'Opening dossier',0.61,'70240020','70240021', '00000000000', '00000000000');
+        services.add(OpenDossService);
+
+        Service__c suppKmService = UtilsData.generateMcmBeService('Supplement mountain km','Supplement per service',null,'Km',0.91,'70240020','70240021', '00000000000', '00000000000');
+        services.add(suppKmService);
+
+        Service__c suppAbrService = UtilsData.generateMcmBeService('Supplement weekend','Supplement per service',null,'Abroad - Belgian doctor',20,'70212090','70212091', '00000000000', '00000000000');
+        services.add(suppAbrService);
+
+        Service__c miscService = UtilsData.generateMcmBeService('Miscellaneous','Miscellaneous',null,null,0,'70212093','70212094', '00000000000', '00000000000');
+        services.add(miscService);
+
+        Service__c yearlyContributionService = UtilsData.generateMcmBeService(InvoiceManager.MCM_SERVICE_YEARLY_CONTRIBUTION,'Annual fee'
+                                                        ,null,null,500,'70000000','70000001', '00000000000', '00000000000');                                                        
+        services.add(yearlyContributionService);
+
+        Service__c packService = UtilsData.generateMcmBeService('Pack','Pack', null, null,1000,'70200000','70204000', '00000000000', '00000000000','Standard');
+        services.add(packService);
+        
+        Service__c packPrivService = UtilsData.generateMcmBeService('Pack Privileged','Pack', null, null,1000,'70200000','70204000', '00000000000', '00000000000','Privileged');
+        services.add(packPrivService);
+
+        Service__c smsService = UtilsData.generateMcmBeService('Notification employee - SMS','Supplement per service',null,'SMS',2,'70212090','70212091', '00000000000', '00000000000');
+        services.add(smsService);
+
+        Service__c sundayService = UtilsData.generateMcmBeService('Notification employee - convocation letter','Supplement per service',null,'Sunday',4,'70212090','70212091', '00000000000', '00000000000');
+        services.add(sundayService);
+        return services;
+    }
+    
     public static List<Service__c> generateFRServices()
     {
         List<Service__c> services = new  List<Service__c>();
         Service__c convocationService = UtilsData.generateMcmFrService('Convocation','Basic fee per service','Convocation',null,110,'70200000','70200000', '00000000000', '00000000000');
         services.add(convocationService);
+
         Service__c homeVisitservice = UtilsData.generateMcmFrService('Home visit','Basic fee per service','Home visit',null,120,'70200000','70200000', '00000000000', '00000000000');
         services.add(homeVisitservice);
+
         Service__c suppFlatService = UtilsData.generateMcmFrService('Supplement flat km','Supplement per service',null,'Flat',0.61,'70240020','70240021', '00000000000', '00000000000');
         services.add(suppFlatService);
+
         Service__c suppMountService = UtilsData.generateMcmFrService('Supplement mountain km','Supplement per service',null,'Mountain',0.91,'70240020','70240021', '00000000000', '00000000000');
         services.add(suppMountService);
+
         Service__c suppWkService = UtilsData.generateMcmFrService('Supplement weekend','Supplement per service',null,'Weekend',20,'70212090','70212091', '00000000000', '00000000000');
         services.add(suppWkService);
+
         Service__c miscService = UtilsData.generateMcmFrService('Miscellaneous','Miscellaneous',null,null,null,'70212093','70212094', '00000000000', '00000000000');
         services.add(miscService);
-        Service__c yearlyContributionService = UtilsData.generateMcmFrService(StaticConstants.MCM_SERVICE_YEARLY_CONTRIBUTION,'Annual fee'
-                                                        ,null,null,500,'70000000','70000001', '00000000000', '00000000000');
+
+        Service__c yearlyContributionService = UtilsData.generateMcmFrService(InvoiceManager.MCM_SERVICE_YEARLY_CONTRIBUTION,'Annual fee'
+                                                        ,null,null,500,'70000000','70000001', '00000000000', '00000000000');                                                        
         services.add(yearlyContributionService);
-        Service__c packService = UtilsData.generateMcmFrService('Pack','Pack', null, null,1000,'70200000','70204000', '00000000000', '00000000000');
+
+        Service__c packService = UtilsData.generateMcmFrService('Pack','Pack', null, null,1000,'70200000','70204000', '00000000000', '00000000000','Standard');
         services.add(packService);
+        
+        Service__c packPrivService = UtilsData.generateMcmFrService('Pack Privileged','Pack', null, null,1000,'70200000','70204000', '00000000000', '00000000000','Privileged');
+        services.add(packPrivService);
+
         Service__c smsService = UtilsData.generateMcmFrService('Notification employee - SMS','Supplement per service',null,'SMS',2,'70212090','70212091', '00000000000', '00000000000');
         services.add(smsService);
+
         Service__c letterService = UtilsData.generateMcmFrService('Notification employee - convocation letter','Supplement per service',null,'Letter',4,'70212090','70212091', '00000000000', '00000000000');
         services.add(letterService);
         return services;

@@ -1,15 +1,75 @@
 /*******************************************************************************
 * @author		Novera - QLE
+* @testClasses: CustomerInvoicingTest, DoctorRemunerationTest
 * @date		    2020-09-25
 * @description  Server-side controller of createInvoiceFromContractHome/createInvoiceFromAccount lightning components
 ********************************************************************************/
 public without sharing class createInvoiceController
 {
+
+    public static Map<String,Id> servicePerVisitTypeFR{
+        get{
+            if(servicePerVisitTypeFR==null){
+                Map<String,Id> serviceMap = ServiceAppointmentManager.servicePerVisitTypePerCountryMap.get('FR');
+                servicePerVisitTypeFR =serviceMap;
+            }
+            return servicePerVisitTypeFR;
+        }
+        set;
+    }
+    
+
+    public static Set<Id> basicOrSupplNotKmIds{
+        get{
+            if(basicOrSupplNotKmIds==null && servicePerVisitTypeFR!=null)
+            {
+                Set<Id> serviceIds = new Set<Id>();
+                for(String key : servicePerVisitTypeFR.keySet())
+                {
+                   if(key!='Miscellaneous' || key!='Flat' || key!='Mountain' || key!='Km')
+                    {
+                        serviceIds.add(servicePerVisitTypeFR.get(key));
+                    }
+                }
+                basicOrSupplNotKmIds = serviceIds;
+            }
+            return basicOrSupplNotKmIds;
+        }
+        set;
+    }
+
+    public static Set<Id> supplKmIds{
+        get{
+            if(supplKmIds==null && servicePerVisitTypeFR!=null)
+            {
+                Set<Id> serviceIds = new Set<Id>();
+                for(String key : servicePerVisitTypeFR.keySet())
+                {
+                   if(key=='Flat' || key=='Mountain' || key=='Km')
+                    {
+                        serviceIds.add(servicePerVisitTypeFR.get(key));
+                    }
+                }
+                supplKmIds = serviceIds;
+            }
+            return supplKmIds;
+        }
+        set;
+    }
+
     public static Id miscFrServiceId{
         get{
-            if(miscFrServiceId==null){
-                Id serviceId = [SELECT Id FROM Service__c WHERE Available_for_country__c='FR' AND Service_category__c='Miscellaneous' LIMIT 1].Id;
-				miscFrServiceId = serviceId;
+            if(miscFrServiceId==null && servicePerVisitTypeFR!=null)
+            {
+                Id miscId;
+                for(String key : servicePerVisitTypeFR.keySet())
+                {
+                   if(key=='Miscellaneous')
+                    {
+                        miscId = servicePerVisitTypeFR.get(key);
+                    }
+                }
+                miscFrServiceId = miscId;
             }
             return miscFrServiceId;
         }
@@ -32,6 +92,7 @@ public without sharing class createInvoiceController
             Integer totalNumberOfRec;
             if(typeOfInvoicing==InvoiceManager.INVOICE_TYPE_YEARLY_CONTRIBUTION_INVOICING)
             {
+                System.debug('QLE HERE');
                 Set<Id> ctrHomeIdSet = new Set<Id>();
                 for(Contractual_Service_Line_Item__c csli : [SELECT Contract_Home__c FROM Contractual_Service_Line_Item__c 
                     WHERE Service__r.Service_category__c=:StaticConstants.SERVICE_CATEGORY_YEARLY_CONTRIBUTION
@@ -43,9 +104,11 @@ public without sharing class createInvoiceController
                     ctrHomeIdSet.add(csli.Contract_Home__c);
                 }        
                 totalNumberOfRec=ctrHomeIdSet.size();        
+                System.debug('QLE totalNumberOfRec ' + totalNumberOfRec);
                 if(totalNumberOfRec>0)
-                {                    
-                    batchJobId = Database.executeBatch(new massYearlyContributionInvoiceBatch(), 200);
+                {            
+                    
+                    batchJobId = Database.executeBatch(new massYearlyContributionInvoiceBatch(), 2000);
                 }
                 else
                 {
@@ -72,7 +135,7 @@ public without sharing class createInvoiceController
                 }
                 if(totalNumberOfRec>0)
                 {                    
-                    batchJobId = Database.executeBatch(new massServicingInvoiceBatch(), 200);
+                    batchJobId = Database.executeBatch(new massServicingInvoiceBatch(), 2000);
                 }
                 else
                 {
@@ -83,12 +146,12 @@ public without sharing class createInvoiceController
             {
                 Set<Id> doctorIdSet = new Set<Id>();
                 totalNumberOfRec=0;
-                // for(ServiceAppointment sa:[ SELECT Assigned_Resource__r.AccountId FROM ServiceAppointment
-                //         WHERE Remuneration_Status__c=:ServiceAppointmentManager.REMUNERATION_STATUS_INVOICE_DETAIL_LINE_GENERATED
-                //         AND TECH_Close_Date__c = LAST_MONTH AND Remuneration_on_hold__c=FALSE])
                 for(ServiceAppointment sa:[ SELECT Assigned_Resource__r.AccountId FROM ServiceAppointment
                         WHERE Remuneration_Status__c=:ServiceAppointmentManager.REMUNERATION_STATUS_INVOICE_DETAIL_LINE_GENERATED
-                       AND Remuneration_on_hold__c=FALSE])
+                        AND TECH_Close_Date__c = LAST_MONTH AND Remuneration_on_hold__c=FALSE])
+                // for(ServiceAppointment sa:[ SELECT Assigned_Resource__r.AccountId FROM ServiceAppointment
+                //         WHERE Remuneration_Status__c=:ServiceAppointmentManager.REMUNERATION_STATUS_INVOICE_DETAIL_LINE_GENERATED
+                //        AND Remuneration_on_hold__c=FALSE AND Doctor_Convention__c!=null])
                 {
                     if(sa.Assigned_Resource__r.AccountId!=null)
                     {
@@ -98,7 +161,7 @@ public without sharing class createInvoiceController
                 }
                 if(totalNumberOfRec>0)
                 {                    
-                    batchJobId = Database.executeBatch(new massDoctorRemunerationBatch(), 200);
+                    batchJobId = Database.executeBatch(new massDoctorRemunerationBatch(), 2000);
                 }
                 else
                 {
@@ -108,6 +171,16 @@ public without sharing class createInvoiceController
             else if(typeOfInvoicing==InvoiceManager.INVOICE_TYPE_END_OF_YEAR_INVOICING)
             {
                 //TO DO
+            }
+            // HTR Add branch to handle send invoice to SAP
+            else if(typeOfInvoicing==InvoiceManager.SEND_INVOICE_TO_SAP)
+            {
+                Database.executeBatch(new sendInvoiceToSAPBatch(), 50);
+            }
+            // HTR Add branch to handle send invoice to Scriptura
+            else if(typeOfInvoicing==InvoiceManager.SEND_INVOICE_TO_SCRIPTURA)
+            {
+                Database.executeBatch(new sendInvoiceToScripturaBatch(), 50);
             }
             if(batchJobId!=null)
             {
@@ -319,8 +392,8 @@ public without sharing class createInvoiceController
         else
         {
             Savepoint sp = Database.setSavepoint();
-            // try
-            // {
+            try
+            {
                 //OAPPMEDCHECK-728 1 account, multiple contracts => multiple invoices
                 Map<Id,Contract_Home__c> ctrPerIdMap = new Map<Id,Contract_Home__c>(); 
                 Map<Id,Map<Id,Contractual_Service_Line_Item__c>> csPerServIdPerCtrIdMap = new  Map<Id,Map<Id,Contractual_Service_Line_Item__c>>();  
@@ -330,7 +403,7 @@ public without sharing class createInvoiceController
                 List<InvoiceLineItem__c> invoiceLIsToInsert = new List<InvoiceLineItem__c>();
                 Map<Id,List<InvoiceLineItem__c>> ilisPerInvIdMap = new Map<Id,List<InvoiceLineItem__c>>();
                 List<Service_Appointment_Line_Item__c> salisToUpdate = new List<Service_Appointment_Line_Item__c>();//SALI represent invoice detail line )- they must point to the parent invoice line
-                Map<String,Id> servicePerVisitType = ServiceAppointmentManager.servicePerVisitTypePerCountryMap.get('FR'); 
+                /*Map<String,Id> servicePerVisitType = ServiceAppointmentManager.servicePerVisitTypePerCountryMap.get('FR');
 
                 /**********************************Preparing the invoice details*******************************************/
                 //Retrieve SALI that are part of the invoice between the specified period and group SALI per Service per Contract
@@ -424,27 +497,6 @@ public without sharing class createInvoiceController
                     invoicesToInsert.add(inv);
                 }
                 insert invoicesToInsert;  // Invoice must be inserted to generate Id, so that we can reference it on Invoice Line Item
-                
-                //OAPPMEDCHECK-475 Service category = 'basic fee per service' OR service category = 'suppl per service' AND suppl type not in (km, flat, mountain)
-                Set<Id> basicOrSupplNotKmIds = new Set<Id>();
-                //OAPPMEDCHECK-475 service category =  'suppl per service' AND suppl type in (km, flat, mountain)
-                Set<Id> supplKmIds = new Set<Id>();
-                //OAPPMEDCHECK-475 For service category = 'miscellaneous'
-                Id miscId;
-                for(String key : servicePerVisitType.keySet())
-                {
-                    switch on key {
-                        when 'Miscellaneous' {
-                            miscId = servicePerVisitType.get(key);
-                        }
-                        when 'Flat','Mountain','Km' {
-                            supplKmIds.add(servicePerVisitType.get(key));
-                        }
-                        when else {
-                            basicOrSupplNotKmIds.add(servicePerVisitType.get(key));
-                        }
-                    }
-                }
 
                 //OAPPMEDCHECK-475
                 Map<Id,Map<Id,Map<Decimal,List<Service_Appointment_Line_Item__c>>>> salisPerAmountPerServIdPerInvIdMap = new Map<Id,Map<Id,Map<Decimal,List<Service_Appointment_Line_Item__c>>>>();
@@ -465,7 +517,7 @@ public without sharing class createInvoiceController
                     for(Id serviceId : salisPerServIdPerCtrIdMap.get(inv.Contract_Home__c).keySet())
                     {
                         Map<Decimal,List<Service_Appointment_Line_Item__c>> salisPerAmountMap = new Map<Decimal,List<Service_Appointment_Line_Item__c>>();
-                        if(serviceId==miscId || supplKmIds.contains(serviceId))
+                        if(serviceId==miscFrServiceId || supplKmIds.contains(serviceId))
                         {
                             ilis.add(new InvoiceLineItem__c(Invoice__c = inv.Id,RecordTypeId = UtilsConstants.RT_ID_INVOICE_LINE_ITEM_MEDICAL_CONTROL));
                         }
@@ -514,7 +566,7 @@ public without sharing class createInvoiceController
                         Contractual_Service_Line_Item__c csli = csPerServIdMap.get(serviceId); 
         
                         System.debug('QLE serviceId ' + serviceId); 
-                        if(serviceId==miscId || supplKmIds.contains(serviceId))
+                        if(serviceId==miscFrServiceId || supplKmIds.contains(serviceId))
                         {
                             Double totalAmount = 0;
                             Double totalKm = 0;
@@ -585,11 +637,11 @@ public without sharing class createInvoiceController
                 {
                     return Label.multipleInvoices;
                 }
-            // }
-            // catch(Exception e){
-            //     Database.rollback(sp);
-            //     throw new AuraHandledException(e.getMessage());
-            // }
+            }
+            catch(Exception e){
+                Database.rollback(sp);
+                throw new AuraHandledException(e.getMessage());
+            }
         }
     }   
 
@@ -604,12 +656,8 @@ public without sharing class createInvoiceController
     @AuraEnabled
     public static String createRemunerationFromDoctorAccount(Account doc, String typeOfInvoicing, Date fromDate, Date toDate)
     {
-        System.debug('QLE doc ' + doc);
-        System.debug('QLE typeOfInvoicing ' + typeOfInvoicing);
-        System.debug('QLE fromDate ' + fromDate);
-        System.debug('QLE toDate ' + toDate);
         List<ServiceAppointment> saListToUpdate = new List<ServiceAppointment>(); //Invoicing Status must be updated
-        
+ 
         //OAPPMEDCHECK-660 totalAmount per Account, if 0, no need to generate Remuneration
         List<AggregateResult> aggresult = [SELECT SUM(Amount__c) sumAmount  FROM Service_Appointment_Line_Item__c 
                         WHERE Invoicing_type__c = :ServiceAppointmentManager.INVOICE_DETAIL_LINE_REMUNERATION_TYPE
@@ -650,11 +698,11 @@ public without sharing class createInvoiceController
             {
                 //OAPPMEDCHECK-728 1 account, multiple contracts => multiple Remunerations
                 Map<Id,Contract_Home__c> convPerIdMap = new Map<Id,Contract_Home__c>(); 
-                Map<Id,Map<Id,Id>> csIdPerServIdPerConvIdMap = new  Map<Id,Map<Id,Id>>();  
+                Map<Id,Map<Id,Contractual_Service_Line_Item__c>> csPerServIdPerConvIdMap = new  Map<Id,Map<Id,Contractual_Service_Line_Item__c>>();  
                 Map<Id,Set<Id>> saIdsPerConvId = new Map<Id,Set<Id>>();
                 Map<Id,Map<Id,List<Service_Appointment_Line_Item__c>>> salisPerServIdPerCtrIdMap = new Map<Id,Map<Id,List<Service_Appointment_Line_Item__c>>>();
                 Set<Id> serviceKmIdSet = new Set<Id>();
-                List<Invoice__c> RemunerationsToInsert = new List<Invoice__c>();
+                List<Invoice__c> remunerationsToInsert = new List<Invoice__c>();
                 List<InvoiceLineItem__c> RemunerationLIsToInsert = new List<InvoiceLineItem__c>();
                 Map<Id,List<InvoiceLineItem__c>> ilisPerInvIdMap = new Map<Id,List<InvoiceLineItem__c>>();
                 List<Service_Appointment_Line_Item__c> salisToUpdate = new List<Service_Appointment_Line_Item__c>();//SALI represent Remuneration detail line )- they must point to the parent Remuneration line
@@ -714,22 +762,22 @@ public without sharing class createInvoiceController
                 }
 
                 /**********************************Preparing the convention information*******************************************/
-                for(Contract_Home__c conv : [SELECT Id, Account__c, RecordTypeId, Specific_VAT_Picklist__c
-                        ,(SELECT Id, Service__c FROM Contractual_Service_Line_Items__r WHERE Service__r.Service_category__c!='Pack' AND Service__r.Service_category__c!='Annual fee')
+                for(Contract_Home__c conv : [SELECT Id, Account__c, RecordTypeId, Specific_VAT_Picklist__c, Invoice_Digit_Doctor__c
+                        ,(SELECT Id, Service__c, Price_Rate_1__c FROM Contractual_Service_Line_Items__r WHERE Service__r.Service_category__c!='Pack' AND Service__r.Service_category__c!='Annual fee')
                     FROM Contract_Home__c WHERE Id IN:saIdsPerConvId.keySet() AND RecordTypeId!=:ContractHomeManager.mcmRtPricingId])
                 {
                     convPerIdMap.put(conv.Id,conv);
-                    Map<Id,Id> csIdPerServIdMap = new Map<Id,Id>();   
+                    Map<Id,Contractual_Service_Line_Item__c> csIdPerServIdMap = new Map<Id,Contractual_Service_Line_Item__c>();   
                     //Group Contractual Service Line Item per Service
                     for(Contractual_Service_Line_Item__c csli : conv.Contractual_Service_Line_Items__r)
                     {
                         //There is only one active csli per service per contract (except pack) - check on insert of CSLI
-                        csIdPerServIdMap.put(csli.Service__c,csli.Id);
+                        csIdPerServIdMap.put(csli.Service__c,csli);
                     } 
-                    csIdPerServIdPerConvIdMap.put(conv.Id,csIdPerServIdMap);
+                    csPerServIdPerConvIdMap.put(conv.Id,csIdPerServIdMap);
                 } 
                 
-                if(csIdPerServIdPerConvIdMap.isEmpty())
+                if(csPerServIdPerConvIdMap.isEmpty())
                 {
                     throw new CustomException(Label.noContractFound); 
                 }
@@ -745,35 +793,133 @@ public without sharing class createInvoiceController
         
                     //Define Remuneration 
                     Invoice__c inv = InvoiceManager.createMCMInvoice('19',invLg,typeOfInvoicing,'Draft',conv.Id,convCountry,null,conv.Account__c,null,'',specificVAT,null,InvoiceManager.RT_ID_REMUNERATION_MEDICAL_CONTROL);
-                    RemunerationsToInsert.add(inv);
+                    inv.Invoice_Digit_Doctor__c = conv.Invoice_Digit_Doctor__c!=null?conv.Invoice_Digit_Doctor__c + 1:1;
+                    remunerationsToInsert.add(inv);
                 }
-                insert RemunerationsToInsert;  // Remuneration must be inserted to generate Id, so that we can reference it on Remuneration Line Item
-    
-                                
+                insert remunerationsToInsert;  // Remuneration must be inserted to generate Id, so that we can reference it on Remuneration Line Item
+                
+                //OAPPMEDCHECK-959
+                Map<Id,Map<Id,Map<Decimal,List<Service_Appointment_Line_Item__c>>>> salisPerAmountPerServIdPerRemIdMap = new Map<Id,Map<Id,Map<Decimal,List<Service_Appointment_Line_Item__c>>>>();
+                     
                 /*Insert Remuneration line (1 per Service) to generate Id. We link SALIs with the same Service to the same Remuneration line.
                 Placeholders, we insert as many lines as the number of services we have from the grouping of SALIs per Contract*/
-                for(Invoice__c inv : RemunerationsToInsert)
+                for(Invoice__c inv : remunerationsToInsert)
                 {
                     List<InvoiceLineItem__c> ilis = new List<InvoiceLineItem__c>();
+                    Map<Id,Map<Decimal,List<Service_Appointment_Line_Item__c>>> salisPerAmountPerServIdMap = new Map<Id,Map<Decimal,List<Service_Appointment_Line_Item__c>>>();
+                    for(Id serviceId : salisPerServIdPerCtrIdMap.get(inv.Contract_Home__c).keySet())
+                    {
+                        Map<Decimal,List<Service_Appointment_Line_Item__c>> salisPerAmountMap = new Map<Decimal,List<Service_Appointment_Line_Item__c>>();
+                        if(serviceId==miscFrServiceId || supplKmIds.contains(serviceId))
+                        {
+                            ilis.add(new InvoiceLineItem__c(Invoice__c = inv.Id,RecordTypeId = UtilsConstants.RT_ID_INVOICE_LINE_ITEM_MEDICAL_CONTROL));
+                        }
+                        else
+                        {
+                            for(Service_Appointment_Line_Item__c sali : salisPerServIdPerCtrIdMap.get(inv.Contract_Home__c).get(serviceId))
+                            {
+                                if(salisPerAmountMap.containsKey(sali.Amount__c))
+                                {
+                                    List<Service_Appointment_Line_Item__c> salis = salisPerAmountMap.get(sali.Amount__c);
+                                    salis.add(sali);
+                                    salisPerAmountMap.put(sali.Amount__c,salis);
+                                }
+                                else 
+                                {
+                                    List<Service_Appointment_Line_Item__c> salis = new List<Service_Appointment_Line_Item__c>();
+                                    salis.add(sali);
+                                    salisPerAmountMap.put(sali.Amount__c,salis);
+                                }
+                            }
+                            for(Decimal amt : salisPerAmountMap.keySet())
+                            {
+                                ilis.add(new InvoiceLineItem__c(Invoice__c = inv.Id,RecordTypeId = UtilsConstants.RT_ID_INVOICE_LINE_ITEM_MEDICAL_CONTROL));
+                            }
+                        }
+                        salisPerAmountPerServIdMap.put(serviceId,salisPerAmountMap);
+                    }
+                    salisPerAmountPerServIdPerRemIdMap.put(inv.Id,salisPerAmountPerServIdMap);
+                    RemunerationLIsToInsert.addAll(ilis);
+                    ilisPerInvIdMap.put(inv.Id,ilis);
+                    /*
                     for(Id serviceId : salisPerServIdPerCtrIdMap.get(inv.Contract_Home__c).keySet())
                     {
                         ilis.add(new InvoiceLineItem__c(Invoice__c = inv.Id,RecordTypeId = UtilsConstants.RT_ID_INVOICE_LINE_ITEM_MEDICAL_CONTROL));
                     }
                     RemunerationLIsToInsert.addAll(ilis);
                     ilisPerInvIdMap.put(inv.Id,ilis);
+                    */
                 }
                 insert RemunerationLIsToInsert; 
-                
+
+            
                 /*Insert Remuneration line (1 per Service) to generate Id. We link SALIs with the same Service to the same Remuneration line.*/
-                for(Invoice__c inv : RemunerationsToInsert)
+                for(Invoice__c inv : remunerationsToInsert)
                 {
+
                     Map<Id,List<Service_Appointment_Line_Item__c>> salisPerServIdMap = salisPerServIdPerCtrIdMap.get(inv.Contract_Home__c);
-                    Map<Id,Id> csIdPerServIdMap = csIdPerServIdPerConvIdMap.get(inv.Contract_Home__c);
+                    Map<Id,Map<Decimal,List<Service_Appointment_Line_Item__c>>> salisPerAmountPerServIdMap = salisPerAmountPerServIdPerRemIdMap.get(inv.Id);
+                    Map<Id,Contractual_Service_Line_Item__c> csPerServIdMap = csPerServIdPerConvIdMap.get(inv.Contract_Home__c);
                     List<InvoiceLineItem__c> ilis = ilisPerInvIdMap.get(inv.Id);
                     Integer i=0;
                     //Compute total quantity and amount per Remuneration line (thus per service)
                     for(Id serviceId : salisPerServIdMap.keySet())
                     {  
+                        Contractual_Service_Line_Item__c csli = csPerServIdMap.get(serviceId); 
+        
+                        System.debug('QLE serviceId ' + serviceId); 
+                        if(serviceId==miscFrServiceId || supplKmIds.contains(serviceId))
+                        {
+                            Double totalAmount = 0;
+                            Double totalKm = 0;
+                            InvoiceLineItem__c invLI = ilis.get(i);
+                            List<Service_Appointment_Line_Item__c> saliList = salisPerServIdMap.get(serviceId);
+                            for(Service_Appointment_Line_Item__c saLineItem : saliList)
+                            {
+                                if(supplKmIds.contains(serviceId))
+                                {
+                                    if(saLineItem.TECH_Km__c!=null) totalKm = totalKm + saLineItem.TECH_Km__c; 
+                                }
+                                if(saLineItem.Amount__c!=null) totalAmount = totalAmount + saLineItem.Amount__c;  
+                                saLineItem.InvoiceLineItem__c = invLI.Id; 
+                                salisToUpdate.add(saLineItem);
+                            }
+                            invLI.Description__c= inv.Billing_Language__c=='NL'?saliList[0].Service__r.Service_Name_NL__c:saliList[0].Service__r.Service_Name_FR__c;
+                            invLI.Unit_Price__c = csli!=null?csli.Price_Rate_1__c:null;
+                            invLI.Quantity__c = supplKmIds.contains(serviceId)?totalKm:null;
+                            invLI.Amount_Excluding_VAT_Currency__c = totalAmount;
+                            invLI.Contractual_Service_Line_Item__c = csli!=null?csli.Id:null;
+                            invLI.ILI_Order__c = saliList[0].Service__r.Order__c;
+                            i++;
+                        }
+                        else
+                        {
+                            for(Decimal amt : salisPerAmountPerServIdMap.get(serviceId).keySet())
+                            {
+                                InvoiceLineItem__c invLI = ilis.get(i);
+                                Double totalAmount = 0;
+                                Integer quantity=0; // not simply saLineItems.size() since we shouldn't count line where Amount__c=
+                                List<Service_Appointment_Line_Item__c> saliList = salisPerAmountPerServIdMap.get(serviceId).get(amt);
+                                for(Service_Appointment_Line_Item__c saLineItem : saliList)
+                                {
+                                    if(saLineItem.Amount__c!=null&&saLineItem.Amount__c!=0) 
+                                    {
+                                        totalAmount = totalAmount + saLineItem.Amount__c;
+                                        quantity = quantity + 1;
+                                    }
+                                    saLineItem.InvoiceLineItem__c = invLI.Id; 
+                                    salisToUpdate.add(saLineItem);
+                                }
+                                invLI.Description__c= inv.Billing_Language__c=='NL'?saliList[0].Service__r.Service_Name_NL__c:saliList[0].Service__r.Service_Name_FR__c;
+                                invLI.Unit_Price__c = amt;
+                                invLI.Quantity__c = quantity;
+                                invLI.Amount_Excluding_VAT_Currency__c = totalAmount;
+                                invLI.Contractual_Service_Line_Item__c = csli!=null?csli.Id:null;
+                                invLI.ILI_Order__c = saliList[0].Service__r.Order__c;
+                                i++;
+                            }
+                        }
+                        /*
                         List<Service_Appointment_Line_Item__c> saLineItems = salisPerServIdMap.get(serviceId);
                         Integer quantity=0; // not simply saLineItems.size() since we shouldn't count line where Amount__c=0
                         Double totalAmount = 0;
@@ -804,7 +950,7 @@ public without sharing class createInvoiceController
                         invLI.Amount_Excluding_VAT_Currency__c = totalAmount;
                         invLI.Contractual_Service_Line_Item__c = csIdPerServIdMap.get(serviceId);
                         invLI.ILI_Order__c = saLineItems[0].Service__r.Order__c;
-                        i++;
+                        i++;*/
                     }
                     for(Id saId : saIdsPerConvId.get(inv.Contract_Home__c))
                     {
@@ -815,9 +961,9 @@ public without sharing class createInvoiceController
                 update RemunerationLIsToInsert;
                 update salisToUpdate;
                 update saListToUpdate;
-                if(RemunerationsToInsert.size()==1)
+                if(remunerationsToInsert.size()==1)
                 {
-                    return RemunerationsToInsert[0].Id;
+                    return remunerationsToInsert[0].Id;
                 }
                 else
                 {

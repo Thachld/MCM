@@ -45,7 +45,7 @@ global class massYearlyContributionInvoiceBatch implements Database.Batchable<sO
     global void execute(Database.BatchableContext bc, List<Contractual_Service_Line_Item__c> scope)
     {
         List<Invoice_Batch_Result__c> invoiceBatchResult = [SELECT Id FROM Invoice_Batch_Result__c WHERE Batch_Id__c =: bc.getJobId()]; 
-        // try{
+        try{
             Id batchResultId = invoiceBatchResult.size()==1?invoiceBatchResult[0].Id:null;
             List<Contractual_Service_Line_Item__c> csliToProcess = new List<Contractual_Service_Line_Item__c>();//OAPPMEDCHECK-836
             List<Invoice__c> invoicesToInsert = new List<Invoice__c>();
@@ -132,7 +132,7 @@ global class massYearlyContributionInvoiceBatch implements Database.Batchable<sO
                 if(csliList.size()==1)
                 {
                     Invoice__c invoiceToCreate = InvoiceManager.createMCMInvoice('30',lgPerInvAccIdMap.get(csli.Contract_Home__r.Invoicing_Account__c)
-                                                                                ,StaticConstants.INVOICE_TYPE_YEARLY_CONTRIBUTION_INVOICING
+                                                                                ,InvoiceManager.INVOICE_TYPE_YEARLY_CONTRIBUTION_INVOICING
                                                                                 ,'Draft',ctrHomeId
                                                                                 ,ctrHCountry,invoicingTerm
                                                                                 ,csli.Contract_Home__r.Invoicing_Account__c
@@ -147,8 +147,8 @@ global class massYearlyContributionInvoiceBatch implements Database.Batchable<sO
                 else if(csliList.size()>1)
                 {                 
                     Invoice__c invoiceToCreate = InvoiceManager.createMCMInvoice('30',lgPerInvAccIdMap.get(csli.Contract_Home__r.Invoicing_Account__c)
-                                                                                ,StaticConstants.INVOICE_TYPE_YEARLY_CONTRIBUTION_INVOICING
-                                                                                ,StaticConstants.INVOICE_STATUS_ERROR
+                                                                                ,InvoiceManager.INVOICE_TYPE_YEARLY_CONTRIBUTION_INVOICING
+                                                                                ,InvoiceManager.INVOICE_STATUS_ERROR
                                                                                 ,ctrHomeId,ctrHCountry,null
                                                                                 ,csli.Contract_Home__r.Invoicing_Account__c
                                                                                 ,batchResultId
@@ -177,7 +177,7 @@ global class massYearlyContributionInvoiceBatch implements Database.Batchable<sO
                         ,ctrHCountryPerCtrIdMap.get(inv.Contract_Home__c)=='FRA'?'FR':'BE'
                         ,inv.Id,Label.TodosAfterInvoicing,afterTodosPerCtr.get(inv.Contract_Home__c),1));                                  
                 }
-                if(inv.Status__c!=StaticConstants.INVOICE_STATUS_ERROR)
+                if(inv.Status__c!=InvoiceManager.INVOICE_STATUS_ERROR)
                 {
                     List<Contractual_Service_Line_Item__c> csliList  = csliListPerCtrHomeId.get(inv.Contract_Home__c);
                     Contractual_Service_Line_Item__c csli = csliList[0];
@@ -197,24 +197,24 @@ global class massYearlyContributionInvoiceBatch implements Database.Batchable<sO
             if(!invoicesWithError.isEmpty()) Database.update(invoicesWithError,false);
             if(!contractHomeToUpdate.isEmpty()) Database.update(contractHomeToUpdate,false);
             if(!taskToInsert.isEmpty()) Database.insert(taskToInsert,false);
-        // }
-        // catch(Exception e){
-        //     if(invoiceBatchResult.size()==1)
-        //     {
-        //         invoiceBatchResult[0].Status__c='Failed';
-        //         update invoiceBatchResult[0]; 
-        //     }
-        //     else {
-        //         System.debug('ERROR massYearlyContributionInvoiceBatch ' + e.getMessage());
-        //     }
+        }
+        catch(Exception e){
+            if(invoiceBatchResult.size()==1)
+            {
+                invoiceBatchResult[0].Status__c='Failed';
+                update invoiceBatchResult[0]; 
+            }
+            else {
+                System.debug('ERROR massYearlyContributionInvoiceBatch ' + e.getMessage());
+            }
 
-        // }  
+        }  
     }    
 
     global void finish(Database.BatchableContext bc)
     {
         //execute any post-processing operations
-        List<Invoice_Batch_Result__c> invoiceBatchResult = [SELECT Id FROM Invoice_Batch_Result__c WHERE Batch_Id__c =: bc.getJobId()]; 
+        List<Invoice_Batch_Result__c> invoiceBatchResult = [SELECT Id FROM Invoice_Batch_Result__c WHERE Batch_Id__c =: bc.getJobId() AND Status__c!='Failed']; 
         if(invoiceBatchResult.size()==1)
         {
             List<AggregateResult> aggR = [SELECT Status__c, count(Id) FROM Invoice__c WHERE Generated_by_batch__c=:invoiceBatchResult[0].Id GROUP BY Status__c];
@@ -224,11 +224,11 @@ global class massYearlyContributionInvoiceBatch implements Database.Batchable<sO
             for (AggregateResult ar : aggR)  {
                 String status = (String) ar.get('Status__c');
                 Integer countRec = (Integer) ar.get('expr0');
-                if(status==StaticConstants.INVOICE_STATUS_DRAFT)
+                if(status==InvoiceManager.INVOICE_STATUS_DRAFT)
                 {
                     draftCount = countRec;
                 }
-                else if(status==StaticConstants.INVOICE_STATUS_ERROR)
+                else if(status==InvoiceManager.INVOICE_STATUS_ERROR)
                 {
                     errorCount = countRec;
                 }

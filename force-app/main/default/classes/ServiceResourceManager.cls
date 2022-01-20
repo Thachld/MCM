@@ -28,11 +28,10 @@ public with sharing class ServiceResourceManager {
 
         if(!AccId.isEmpty())
         {
-            AccountByIdMap = new Map<Id, Account>([SELECT Id, Share_to_MCM_FR__c, Share_to_MCM_BE__c 
+            AccountByIdMap = new Map<Id, Account>([SELECT Id, Share_to_MCM_FR__c, Share_to_MCM_BE__c
                                                                     FROM Account
                                                                     WHERE Id IN :AccId]);
         }
-        //List<ServiceResource> servResListToUpdate = new List<ServiceResource>();
         for (ServiceResource sr : recordList)
         {
            if(AccountByIdMap.containsKey(sr.AccountId))
@@ -40,10 +39,8 @@ public with sharing class ServiceResourceManager {
                 Account acc = AccountByIdMap.get(sr.AccountId);
                 sr.Tech_Share_to_MCM_FR__c = acc.Share_to_MCM_FR__c;
                 sr.Tech_Share_to_MCM_BE__c = acc.Share_to_MCM_BE__c;
-                //servResListToUpdate.add(sr);
             }
         }
-        //if(!servResListToUpdate.isEmpty()) update servResListToUpdate; 
     }
 
     public static void populateURLbyId(List<ServiceResource> recordList) //OAPPMEDCHECK-773

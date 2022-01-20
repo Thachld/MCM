@@ -25,15 +25,15 @@ public with sharing class ContractualServiceLineItemTriggerHandler
     	{
             if(trigger.isBefore)
     		{      
-                if(trigger.isInsert)
+/*                 if(trigger.isInsert)
                 {
                     ContractualServiceLineItemManager.checkInvoicingRecipient(this.initialRecordList);
-                }
+                } */
                 if(trigger.isUpdate)
                 {
                     ContractualServiceLineItemManager.checkIfPriceBookLineItemInUse(this.initialRecordList, this.recordOldValueMap);
-
-                    ContractualServiceLineItemManager.checkIfContractServiceInUse(this.initialRecordList, this.recordOldValueMap);
+                    //QLE 17_09_2021 for BE
+                    //ContractualServiceLineItemManager.checkIfContractServiceInUse(this.initialRecordList, this.recordOldValueMap);
                 }
                     
             }
@@ -42,7 +42,7 @@ public with sharing class ContractualServiceLineItemTriggerHandler
                 if(trigger.isInsert)
                 {
                     ContractualServiceLineItemManager.createPackInvoicing(this.initialRecordList);
-                    ContractualServiceLineItemManager.createYearlyContributionInvoicing(this.initialRecordList,null);
+                    //OAPPMEDCHECK-1212 ContractualServiceLineItemManager.createYearlyContributionInvoicing(this.initialRecordList,null);
                     ContractualServiceLineItemManager.checkExistingLinePerService(this.initialRecordList,null);
                 }
                 if(trigger.isUpdate)
@@ -61,7 +61,8 @@ public with sharing class ContractualServiceLineItemTriggerHandler
                 if(trigger.isDelete)
                 {
                     ContractualServiceLineItemManager.checkContractualLineItemLink(this.recordOldValueMap.values());
-                    ContractualServiceLineItemManager.deleteContractServiceInUse(this.recordOldValueMap.values());
+                    //QLE 17_09_2021 for BE
+                    //ContractualServiceLineItemManager.deleteContractServiceInUse(this.recordOldValueMap.values());
                 }
     
             }

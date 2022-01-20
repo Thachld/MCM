@@ -9,8 +9,7 @@ public with sharing class ContractualServiceLineItemManagerTest {
         List<Contract_Home__c> ctrHList = new List<Contract_Home__c>();
         List<Contractual_Service_Line_Item__c> csliList = new List<Contractual_Service_Line_Item__c>();
         
-        Product2 p = new Product2 (Name = 'myProduct', ExtSysId__c = '16200',ProductCode = '200');
-        insert p;
+        UtilsDataTest.generateMCMProduct(true);
         
         List<Service__c> services = UtilsData.generateFRServices();
         insert services;
@@ -36,7 +35,7 @@ public with sharing class ContractualServiceLineItemManagerTest {
             accValueMap.put('Securex_Number__c', '123'+ i);
             accValueMap.put('Correspondence_name__c','name corr'+ i);
             Account mainAcc = UtilsData.generateAccount('Main Acc ' + i
-                                    , AccountTriggerHandler.RT_ACCOUNT_MAIN
+                                    , AccountTriggerHandler.RT_FRANCE_ACCOUNT_MAIN
                                     , accValueMap
                                     , false);
             Integer n= 7639241 + 97*i;
@@ -126,13 +125,13 @@ public with sharing class ContractualServiceLineItemManagerTest {
             Contract_Home__c ctrH = new Contract_Home__c(Account__c=invAcc.ParentId
                                         ,Invoicing_Account__c = invAcc.Id
                                         ,Yearly_contribution__c=true
-                                        ,Next_due_date__c = Date.today().addMonths(-1)
+                                        //,Next_due_date__c = Date.today().addMonths(-1) New VR only filled in Tacitly Renewal
                                         ,In_Place_Date__c=Date.today().addYears(-12)
                                         ,Signature_Date__c=Date.today().addYears(-12)
                                         ,Specific_VAT_Picklist__c = l==2?'20.00%':null
                                         ,Version__c=1
-                                        ,Product__c = p.Id
-                                        ,RecordTypeId=ContractHomeManager.mcmRtBEId
+                                        ,Product__c = ContractHomeManager.mcmFrProductId
+                                        ,RecordTypeId=ContractHomeManager.mcmRtFRId
                                         ,Service_Type__c = StaticConstants.TYPE_REGISTRATION_CERTIFICATES
                                         ,Amount_of_km_in_forfait__c=20);
             ctrHList.add(ctrH);
@@ -290,24 +289,24 @@ public with sharing class ContractualServiceLineItemManagerTest {
         Test.stopTest();
     }
 
-    public testMethod static void TestcheckIfContractServiceInUse2(){
-        Test.startTest();
-        List<Contractual_Service_Line_Item__c> listcslitest = [SELECT Id, Price_Rate_1__c, Supplement__c FROM Contractual_Service_Line_Item__c];
+    // public testMethod static void TestcheckIfContractServiceInUse2(){
+    //     Test.startTest();
+    //     List<Contractual_Service_Line_Item__c> listcslitest = [SELECT Id, Price_Rate_1__c, Supplement__c FROM Contractual_Service_Line_Item__c];
 
-        try {
-            Contractual_Service_Line_Item__c cslitest = listcslitest[0];
-            cslitest.Supplement__c = 11;            
+    //     try {
+    //         Contractual_Service_Line_Item__c cslitest = listcslitest[0];
+    //         cslitest.Supplement__c = 11;            
 
-            update cslitest;
+    //         update cslitest;
 
-        } catch (Exception ex) {
-            String updateSupplementMsg = Label.NotAllowChangeContractServiceSupplement;
-            Boolean valid = ex.getMessage().contains(updateSupplementMsg)?true:false;
-            System.assertEquals(true, valid);
-        }
+    //     } catch (Exception ex) {
+    //         String updateSupplementMsg = Label.NotAllowChangeContractServiceSupplement;
+    //         Boolean valid = ex.getMessage().contains(updateSupplementMsg)?true:false;
+    //         System.assertEquals(true, valid);
+    //     }
 
-        Test.stopTest();
-    }
+    //     Test.stopTest();
+    // }
 
 
 

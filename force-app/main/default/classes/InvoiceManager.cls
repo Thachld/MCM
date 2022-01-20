@@ -1,5 +1,6 @@
 /********************************************************************************************************
 * @author         Novera - Selim Lalaoui
+* @testClasses:   InvoiceManagerTest, DoctorRemunerationTest
 * @description    Trigger manager for the Invoice__c object
 * @date           2018 DEC 20
 * @group          Trigger Managers
@@ -13,6 +14,9 @@ public class InvoiceManager
     public static final String INVOICE_TYPE_END_OF_YEAR_INVOICING = 'End of year invoicing';
 	public static final String INVOICE_TYPE_DOCTOR_REMUNERATION = 'Doctor Remuneration';
 	public static final String INVOICE_TYPE_PACK_INVOICING = 'Pack invoicing';
+    // HTR option to send invoice to SAP - Scriptura
+    public static final String SEND_INVOICE_TO_SAP = 'Batch SAP';
+    public static final String SEND_INVOICE_TO_SCRIPTURA = 'Batch Scriptura';
 
 	public static final String INVOICE_TYPE_CN_YEARLY_CONTRIBUTION_INVOICING = 'CN - Yearly contribution invoicing';
     public static final String INVOICE_TYPE_CN_SERVICE_INVOICING = 'CN - Service invoicing';   
@@ -235,7 +239,7 @@ public class InvoiceManager
 	{
 		get
 		{
-			if(InvoiceDigitCreditBeMCM == null && InvoiceDigitCreditBeMCM!=null)
+			if(InvoiceDigitCreditBeMCM == null && RT_ID_INVOICE_MEDICAL_CONTROL!=null)
 			{
 				AggregateResult[] maxNumber = [SELECT MAX(Invoice_Digit__c) maxNumber FROM Invoice__c WHERE Document_Date__c = THIS_YEAR 
 										AND RecordTypeId =:RT_ID_INVOICE_MEDICAL_CONTROL 
@@ -331,6 +335,7 @@ public class InvoiceManager
 				europeanCountries = countries;
 			}
 			return europeanCountries;
+
 		}
 		set;
 	}
@@ -401,23 +406,34 @@ public class InvoiceManager
     **************************************************************************************/
 	public static void InvoicingOnHoldUnflagged(List<Invoice__c> recordList, Map<Id,Invoice__c> oldMap)
 	{
+		List<Invoice__c> invToProcess = new List<Invoice__c>();
 		for(Invoice__c inv : recordList)
 		{
+			// When invoice 'on hold' is unticked
 			if(inv.Invoicing_On_Hold__c==false && inv.Invoicing_On_Hold__c!=oldMap.get(inv.Id).Invoicing_On_Hold__c)
 			{
+			
 				if(inv.Status__c == InvoiceManager.INVOICE_STATUS_ERROR)
 				{
-					inv.Status__c = StaticConstants.INVOICE_STATUS_DRAFT;
+					inv.Status__c = InvoiceManager.INVOICE_STATUS_DRAFT;
 					inv.Error_reason__c = '';
+					invToProcess.add(inv);
 				}
 				else if(inv.Status__c == InvoiceManager.INVOICE_STATUS_ERROR_TO_SCRIPTURA)
 				{
 					inv.Status__c = InvoiceManager.INVOICE_STATUS_VALIDATED_BY_SAP;
 					inv.Error_reason__c = '';
 				}
+				//OAPPMEDCHECK-969
+				if(invToProcess!=null && !invToProcess.isEmpty())
+				{
+					fillAccountAndContactInfo(invToProcess);
+				} 
 			}
 		}
 	}
+
+	
 
 	/**************************************************************************************
     * @author		Novera - QLE
@@ -428,13 +444,54 @@ public class InvoiceManager
     **************************************************************************************/
 	public static void fillInvoiceInformation(List<Invoice__c> recordList)
 	{
-		Set<Id> invAccIdSet = new Set<Id>();
 		Set<Id> ctrIdSet = new Set<Id>();
+		List<Invoice__c> invToProcess = new List<Invoice__c>();
+		Map<Id,Decimal> doctorInvDigitPerCtrIdMap = new Map<Id,Decimal>();//OAPPMEDCHECK-850
+		for(Invoice__c inv : recordList)
+		{
+			// Type 40 = credit note
+			if(inv.Document_type__c  != '40'){
+				if(inv.Contract_Home__c!=null) ctrIdSet.add(inv.Contract_Home__c); 
+				invToProcess.add(inv);
+			}
+			if(inv.Invoice_Digit_Doctor__c!=null)
+			{
+				doctorInvDigitPerCtrIdMap.put(inv.Contract_Home__c,inv.Invoice_Digit_Doctor__c);
+			}
+		}
+		
+		//OAPPMEDCHECK-969 - Method to fill in account and contact information
+		if(invToProcess!=null && !invToProcess.isEmpty())
+		{
+			fillAccountAndContactInfo(invToProcess);
+		} 
+		//OAPPMEDCHECK-939 - Method to compute the VAT code
+		if(ctrIdSet!=null && !ctrIdSet.isEmpty())
+		{
+			fillVATCode(invToProcess, ctrIdSet);
+		} 
+		if(!doctorInvDigitPerCtrIdMap.isEmpty())
+		{
+	 		if(System.isBatch()) updateCounterOnConvention(doctorInvDigitPerCtrIdMap);
+			else updateCounterOnConventionFuture(doctorInvDigitPerCtrIdMap);
+		}
+			
+	}
+
+	/**************************************************************************************
+    * @author		Novera - AMU
+    * @date		    2020-01-26
+    * @description  OAPPMEDCHECK-969 generic method generating account and contact information
+					for invoicing
+    * @param		
+    **************************************************************************************/
+	public static void fillAccountAndContactInfo(List<Invoice__c> recordList)
+	{
+		Set<Id> invAccIdSet = new Set<Id>();
 		for(Invoice__c inv : recordList)
 		{
 			if(inv.Document_type__c  != '40'){
 				if(inv.Invoicing_Account__c!=null) invAccIdSet.add(inv.Invoicing_Account__c);
-				if(inv.Contract_Home__c!=null) ctrIdSet.add(inv.Contract_Home__c); 
 			}			
 		}
 		Map<Id,Account> accountMap = new Map<Id,Account>([SELECT Id,Name,Official_Address_Name__c,Official_address_name_2__c
@@ -447,8 +504,7 @@ public class InvoiceManager
 								,(SELECT ContactId, Contact.FirstName, Contact.LastName, Contact.Salutation 
 									FROM AccountContactRelations WHERE Invoicing_recipient_email__c=TRUE OR Invoicing_recipient_post__c=TRUE)
 							FROM Account WHERE Id IN:invAccIdSet]);
-		Map<Id,Contract_Home__c> ctrMap = new Map<Id,Contract_Home__c>([SELECT Id,Account__r.Official_PostalCode__c,Account__r.Official_country__c
-											FROM Contract_Home__c WHERE Id IN:ctrIdSet]);
+
 		for(Invoice__c inv : recordList)
 		{	
 			//Exclude Credit note
@@ -464,6 +520,8 @@ public class InvoiceManager
 					inv.Billing_Postal_Box__c = invAcc.Official_HouseNrAlpha__c;
 					inv.Billing_Postal_Code__c = invAcc.Official_PostalCode__c;
 					inv.Billing_city__c = invAcc.Official_city__c;
+					System.debug('QLE invAcc.Official_country__c ' + invAcc.Official_country__c); 
+					System.debug('QLE invAcc ' + invAcc.Id); 
 					inv.Billing_country__c = invAcc.Official_country__c;
 					if(inv.Document_Type__c==INVOICE_DOCUMENT_TYPE_30)
 					{
@@ -489,7 +547,7 @@ public class InvoiceManager
 						}
 						else
 						{
-							inv.Status__c=StaticConstants.INVOICE_STATUS_ERROR;
+							inv.Status__c=InvoiceManager.INVOICE_STATUS_ERROR;
 							inv.Invoicing_On_Hold__c = true;
 							inv.Error_reason__c = Label.NoInvoicingContact;
 						}
@@ -502,12 +560,32 @@ public class InvoiceManager
 					}
 				}
 				else {
-					inv.Status__c = StaticConstants.INVOICE_STATUS_ERROR;
+					inv.Status__c = InvoiceManager.INVOICE_STATUS_ERROR;
 					inv.Invoicing_On_Hold__c = true;
 					inv.Error_reason__c = Label.NoInvoicingAccount;
 				}
+			}
+		}
+	}
 
-				//OAPPMEDCHECK-510 - Fill VAT Code for customer invoice
+	/**************************************************************************************
+    * @author		Novera - QLE
+    * @date		    2020-01-26
+    * @description  OAPPMEDCHECK-510 Fill VAT code for customer and remuneration invoices
+					OAPPMEDCHECK-969 Encapsulated method
+    * @param		
+    **************************************************************************************/
+	public static void fillVATCode(List<Invoice__c> recordList, Set<Id> ctrIds)
+	{
+		Map<Id,Contract_Home__c> ctrMap = new Map<Id,Contract_Home__c>([SELECT Id,Account__r.Official_PostalCode__c,Account__r.Official_country__c,
+																				Account__r.Subject_to_VAT__c,Account__r.VAT_Number__c
+																		FROM Contract_Home__c WHERE Id IN:ctrIds]);
+		
+		if(ctrMap!=null && !ctrMap.isEmpty())
+		{
+			for(Invoice__c inv : recordList)
+			{
+				//OAPPMEDCHECK-510 - Fill VAT Code for customer invoice - updated by OAPPMEDCHECK-1021
 				if(inv.Document_Type__c==INVOICE_DOCUMENT_TYPE_30)
 				{
 					if(inv.Contract_Country_Picklist__c=='BEL')
@@ -517,66 +595,94 @@ public class InvoiceManager
 					else if(inv.Contract_Country_Picklist__c=='FRA')
 					{
 						Contract_Home__c ctr = ctrMap.get(inv.Contract_Home__c); 
-						if(inv.Specific_VAT__c==null || inv.Specific_VAT__c==0.00)
-						{
+
 							if(ctr.Account__r.Official_Country__c=='FRA')
 							{
-								if( (ctr.Account__r.Official_PostalCode__c!=null && (ctr.Account__r.Official_PostalCode__c.left(3)=='973'
-								|| ctr.Account__r.Official_PostalCode__c.left(3)=='976') )
-								|| !europeanCountries.contains(ctr.Account__r.Official_Country__c))
-								{
-									inv.VAT_Code_Text__c='O0';
-								}
-								else 
+								inv.VAT_Code_Text__c='C1';
+							}
+							else if(ctr.Account__r.Official_Country__c=='GUF' || ctr.Account__r.Official_Country__c=='MYT')
+							{
+								inv.VAT_Code_Text__c='O0';
+							}
+							else if(ctr.Account__r.Official_Country__c=='GLP' ||ctr.Account__r.Official_Country__c=='MTQ'
+									||ctr.Account__r.Official_Country__c=='REU'|| ctr.Account__r.Official_Country__c=='SPM')
+							{
+								inv.VAT_Code_Text__c='OA';
+							}
+							else if(InvoiceManager.europeanCountries.contains(ctr.Account__r.Official_Country__c))
+							{
+								if(ctr.Account__r.VAT_Number__c!=null)
 								{
 									inv.VAT_Code_Text__c='O5';
 								}
+								else 
+								{
+									inv.VAT_Code_Text__c='C1';
+								}
 							}
-							else {
-								inv.VAT_Code_Text__c='O5';
+							else 
+							{
+								inv.VAT_Code_Text__c='O0';
 							}
-						}
-						else if(inv.Specific_VAT__c==8.50)
-						{
-							inv.VAT_Code_Text__c='OA';
-						}
-						else 
-						{
-							inv.VAT_Code_Text__c='C1';
-						}
 					}
 				}
-				//Fill VAT Code for doctor remuneration - OAPPMEDCHECK-817
+				//Fill VAT Code for doctor remuneration - OAPPMEDCHECK-817 - updated by OAPPMEDCHECK-1021
 				else if(inv.Document_Type__c==INVOICE_DOCUMENT_TYPE_19) 
 				{
 					if(inv.Contract_Country_Picklist__c=='BEL')
 					{
-						//TO DO?
+						inv.VAT_Code_Text__c = '00';
 					} 
 					else if(inv.Contract_Country_Picklist__c=='FRA')
 					{
-						if(inv.Specific_VAT__c == null || inv.Specific_VAT__c==0.00)
+						Contract_Home__c ctr = ctrMap.get(inv.Contract_Home__c); 
+						if(ctr.Account__r.Official_Country__c=='FRA')
 						{
-							inv.VAT_Code_Text__c = 'P5';
+							if(ctr.Account__r.Subject_to_VAT__c==true)
+							{
+								inv.VAT_Code_Text__c = 'R1';
+							}
+							else
+							{
+								inv.VAT_Code_Text__c = 'P5';
+							}
 						}
+						else if(ctr.Account__r.Official_Country__c=='GUF' || ctr.Account__r.Official_Country__c=='MYT')
+						{
+							inv.VAT_Code_Text__c = 'P0';
+						}
+						else if(ctr.Account__r.Official_Country__c=='GLP' ||ctr.Account__r.Official_Country__c=='MTQ'
+						||ctr.Account__r.Official_Country__c=='REU'|| ctr.Account__r.Official_Country__c=='SPM')
+						{
+							if(ctr.Account__r.Subject_to_VAT__c==true)
+							{
+								inv.VAT_Code_Text__c = 'VA';
+							}
+							else
+							{
+								inv.VAT_Code_Text__c = 'P5';
+							}
+						}
+						else if(InvoiceManager.europeanCountries.contains(ctr.Account__r.Official_Country__c))
+						{
+							if(ctr.Account__r.Subject_to_VAT__c==true && ctr.Account__r.VAT_Number__c!=null)
+								{
+									inv.VAT_Code_Text__c = 'P5';
+								}
+								else 
+								{
+									inv.VAT_Code_Text__c = 'R1';
+								}
+							}
 						else
 						{
 							inv.VAT_Code_Text__c = 'R1';
 						}
-						/* if(inv.Invoicing_Account__r.Subject_to_VAT__c == false)
-						{
-							inv.VAT_Code_Text__c = 'P5';
-						}
-						else if(inv.Invoicing_Account__r.Subject_to_VAT__c == true) 
-						{
-							inv.VAT_Code_Text__c = 'R1';
-						} */
 					}
 				}
 			}
 		}
 	}
-
 	/**************************************************************************************
     * @author		Novera - QLE
     * @date		    2020-01-26
@@ -658,12 +764,35 @@ public class InvoiceManager
 
 				if(!alreadyProcessed.contains(invoiceId))
 				{
-					Invoice__c inv = new Invoice__c(Id=invoiceId,Status__c=StaticConstants.INVOICE_STATUS_ERROR,Error_reason__c=errText,Invoicing_On_Hold__c=true);
+					Invoice__c inv = new Invoice__c(Id=invoiceId,Status__c=InvoiceManager.INVOICE_STATUS_ERROR,Error_reason__c=errText,Invoicing_On_Hold__c=true);
 					invList.add(inv);
 				}
 			}
 		}
 		return invList;
+	}
+
+	/**************************************************************************************
+    * @author		Novera - QLE
+    * @date		    2021-10-08
+    * @description  OAPPMEDCHECK-850 Json Remuneration note to Scriptura : each doctor has his own counter. 
+    * @param		
+    **************************************************************************************/
+	public static void updateCounterOnConvention(Map<Id,Decimal> doctorInvDigitPerCtrIdMap)
+	{
+		List<Contract_Home__c> ctrToUpdate = new List<Contract_Home__c>(); 
+		for(Id convId : doctorInvDigitPerCtrIdMap.keySet())
+		{
+			Contract_Home__c conv = new Contract_Home__c(Id=convId,Invoice_Digit_Doctor__c=doctorInvDigitPerCtrIdMap.get(convId));
+			ctrToUpdate.add(conv);
+					}
+		if(!ctrToUpdate.isEmpty()) update ctrToUpdate; 
+	}
+
+	@future
+	public static void updateCounterOnConventionFuture(Map<Id,Decimal> doctorInvDigitPerCtrIdMap)
+	{
+		updateCounterOnConvention(doctorInvDigitPerCtrIdMap);
 	}
 
 }

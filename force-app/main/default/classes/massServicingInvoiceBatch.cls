@@ -11,6 +11,8 @@ global without sharing class massServicingInvoiceBatch implements Database.Batch
         
     global Database.QueryLocator start(Database.BatchableContext bc) 
     {
+
+        /*
         //collect AR records to be passed to execute
         return Database.getQueryLocator('SELECT Id, Invoicing_Account__c, Contract_Home__c, Invoicing_Account__r.Invoicing_Terms__c, Invoicing_Account__r.PO_Number__c'
                                         +',Invoicing_Account__r.Active_Department__c,Invoicing_Account__r.Date_out__c, RecordTypeId'
@@ -22,24 +24,36 @@ global without sharing class massServicingInvoiceBatch implements Database.Batch
                                         + '\' AND TECH_Close_Date__c <= LAST_MONTH AND Invoicing_on_hold__c=FALSE'
                                         //+ '\' AND Invoicing_on_hold__c=FALSE AND Invoicing_Account__c!=null AND Contract_Home__c!=null'
                                         + ' AND Contract_Home__r.Blocked_For_Invoicing__c=FALSE AND Contract_Home__r.RecordTypeId!=\'' + ContractHomeManager.mcmRtPricingId + '\'');
+        */
+        //collect account that might need to get invoiced
+        return Database.getQueryLocator('SELECT Id FROM Account WHERE Invoicing_on_this_account__c=\'Yes\'');
     }
 
-    global void execute(Database.BatchableContext bc, List<Absence_Registration__c> scope)
+    global void execute(Database.BatchableContext bc, List<Account> invoicingAccounts)
     {
-        System.debug('QLE scope ' + scope);
+        System.debug('QLE scope ' + invoicingAccounts);
+        Set<Id> invoicingAccountIdSet = new Set<Id>(); 
+        for(Account invAcc : invoicingAccounts)
+        {
+            invoicingAccountIdSet.add(invAcc.Id);
+        }
+        List<Absence_Registration__c> absencesFromInvAcc = [SELECT Id, Invoicing_Account__c, Contract_Home__c, Invoicing_Account__r.Invoicing_Terms__c, Invoicing_Account__r.PO_Number__c
+                                        ,Invoicing_Account__r.Active_Department__c,Invoicing_Account__r.Date_out__c, RecordTypeId
+                                        ,Contract_Home__r.Specific_VAT_Picklist__c
+                                        ,Contract_Home__r.Todos_before_invoicing__c
+                                        ,Contract_Home__r.RecordTypeId FROM Absence_Registration__c
+                                        WHERE Invoicing_Status__c=:AbsenceRegistrationManager.INVOICING_STATUS_INVOICE_TO_GENERATE
+                                        AND TECH_Close_Date__c <= LAST_MONTH AND Invoicing_on_hold__c=FALSE
+                                        AND Invoicing_on_hold__c=FALSE AND Invoicing_Account__c!=null AND Contract_Home__c!=null
+                                        AND Contract_Home__r.Blocked_For_Invoicing__c=FALSE AND Contract_Home__r.RecordTypeId!=:ContractHomeManager.mcmRtPricingId AND Invoicing_Account__c IN: invoicingAccountIdSet];
         List<Invoice_Batch_Result__c> invoiceBatchResult = [SELECT Id FROM Invoice_Batch_Result__c WHERE Batch_Id__c =: bc.getJobId()]; 
         List<Absence_Registration__c> arToProcess = new List<Absence_Registration__c>();
-        for(Absence_Registration__c ar : scope)
+        for(Absence_Registration__c ar : absencesFromInvAcc)
         {
             System.debug('QLE ar.Contract_Home__r.Todos_before_invoicing__c ' + ar.Contract_Home__r.Todos_before_invoicing__c);
             if(ar.Contract_Home__r.Todos_before_invoicing__c==null) //OAPPMEDCHECK-346 
             {
-                System.debug('QLE ar.Contract_Home__c ' + ar.Contract_Home__c);
-                System.debug('QLE ar.Invoicing_Account__c ' + ar.Invoicing_Account__c);
-                if(ar.Contract_Home__c!=null && ar.Invoicing_Account__c!=null)
-                {
-                    arToProcess.add(ar); //Filter to avoid issue in DEV. ARs can not have Status Invoice To Generate if those 2 informations are missing.
-                }
+                arToProcess.add(ar); //Filter to avoid issue in DEV. ARs can not have Status Invoice To Generate if those 2 informations are missing.
             }
         }
         Savepoint sp = Database.setSavepoint();
@@ -202,7 +216,7 @@ global without sharing class massServicingInvoiceBatch implements Database.Batch
                     ,Invoicing_Account__r.PO_Number__c,Specific_Contract__c,Specific_VAT_Picklist__c, PO_Number__c, RecordTypeId
                     ,Todos_after_invoicing__c
                     ,(SELECT Id, Service__c, Price_Rate_1__c FROM Contractual_Service_Line_Items__r WHERE Service__r.Service_category__c!='Pack' AND Service__r.Service_category__c!='Annual fee')
-                FROM Contract_Home__c WHERE Id IN:ctrIdSet AND Invoicing_Account__c IN:accToInvoiceSet AND RecordTypeId!=:ContractHomeManager.mcmRtPricingId])
+                FROM Contract_Home__c WHERE Id IN:ctrIdSet AND RecordTypeId!=:ContractHomeManager.mcmRtPricingId])
             {
                 ctrPerIdMap.put(ctr.Id,ctr);
                 Map<Id,Contractual_Service_Line_Item__c> csPerServIdMap = new Map<Id,Contractual_Service_Line_Item__c>();   
@@ -239,16 +253,16 @@ global without sharing class massServicingInvoiceBatch implements Database.Batch
                         String invLg = lgPerInvAccId.get(aId)!=null?lgPerInvAccId.get(aId):'FR';
                         
                         //Define invoice 
-                        Invoice__c inv = InvoiceManager.createMCMInvoice('30',invLg,StaticConstants.INVOICE_TYPE_SERVICE_INVOICING,'Draft'
+                        Invoice__c inv = InvoiceManager.createMCMInvoice('30',invLg,InvoiceManager.INVOICE_TYPE_SERVICE_INVOICING,'Draft'
                                         ,cId,ctrHCountry,invoicingTerm,aId,batchResultId,'',specificVAT,poNum,InvoiceManager.RT_ID_INVOICE_MEDICAL_CONTROL);
                         invoicesToInsert.add(inv);
                     }
                 }
             }
             //All draft invoices must be inserted. Otherwise exception thrown.Invoice must be inserted to generate Id, so that we can reference it on Invoice Line Item      
-            //if(!invoicesToInsert.isEmpty()) Database.SaveResult[] srInvoiceList = Database.insert(invoicesToInsert, true);
-            insert invoicesToInsert;
-
+            if(!invoicesToInsert.isEmpty()) Database.SaveResult[] srInvoiceList = Database.insert(invoicesToInsert, true);
+            // insert invoicesToInsert;
+            /*
             //OAPPMEDCHECK-475 Service category = 'basic fee per service' OR service category = 'suppl per service' AND suppl type not in (km, flat, mountain)
             Set<Id> basicOrSupplNotKmIds = new Set<Id>();
             //OAPPMEDCHECK-475 service category =  'suppl per service' AND suppl type in (km, flat, mountain)
@@ -269,6 +283,7 @@ global without sharing class massServicingInvoiceBatch implements Database.Batch
                     }
                 }
             }
+            */
             //OAPPMEDCHECK-475
             Map<Id,Map<Id,Map<Decimal,List<Service_Appointment_Line_Item__c>>>> salisPerAmountPerServIdPerInvIdMap = new Map<Id,Map<Id,Map<Decimal,List<Service_Appointment_Line_Item__c>>>>();
                                 
@@ -282,7 +297,7 @@ global without sharing class massServicingInvoiceBatch implements Database.Batch
                 for(Id serviceId : salisPerServIdPerCtrIdMap.get(inv.Contract_Home__c).keySet())
                 {
                     Map<Decimal,List<Service_Appointment_Line_Item__c>> salisPerAmountMap = new Map<Decimal,List<Service_Appointment_Line_Item__c>>();
-                    if(serviceId==miscId || supplKmIds.contains(serviceId))
+                    if(serviceId==createInvoiceController.miscFrServiceId || createInvoiceController.supplKmIds.contains(serviceId))
                     {
                         ilis.add(new InvoiceLineItem__c(Invoice__c = inv.Id,RecordTypeId = UtilsConstants.RT_ID_INVOICE_LINE_ITEM_MEDICAL_CONTROL));
                     }
@@ -339,7 +354,7 @@ global without sharing class massServicingInvoiceBatch implements Database.Batch
                 for(Id serviceId : salisPerServIdMap.keySet())
                 {  
                     Contractual_Service_Line_Item__c csli = csPerServIdMap.get(serviceId); 
-                    if(serviceId==miscId || supplKmIds.contains(serviceId))
+                    if(serviceId==createInvoiceController.miscFrServiceId || createInvoiceController.supplKmIds.contains(serviceId))
                     {
                         Double totalAmount = 0;
                         Double totalKm = 0;
@@ -347,7 +362,7 @@ global without sharing class massServicingInvoiceBatch implements Database.Batch
                         List<Service_Appointment_Line_Item__c> saLineItems = salisPerServIdMap.get(serviceId);
                         for(Service_Appointment_Line_Item__c saLineItem : saLineItems)
                         {
-                            if(supplKmIds.contains(serviceId))
+                            if(createInvoiceController.supplKmIds.contains(serviceId))
                             {
                                 if(saLineItem.TECH_Km__c!=null) totalKm = totalKm + saLineItem.TECH_Km__c; 
                             }
@@ -357,7 +372,7 @@ global without sharing class massServicingInvoiceBatch implements Database.Batch
                         }
                         invLI.Description__c= inv.Billing_Language__c=='NL'?saLineItems[0].Service__r.Service_Name_NL__c:saLineItems[0].Service__r.Service_Name_FR__c;
                         invLI.Unit_Price__c = csli!=null?csli.Price_Rate_1__c:null;
-                        invLI.Quantity__c = supplKmIds.contains(serviceId)?totalKm:null;
+                        invLI.Quantity__c = createInvoiceController.supplKmIds.contains(serviceId)?totalKm:null;
                         invLI.Amount_Excluding_VAT_Currency__c = totalAmount;
                         invLI.Contractual_Service_Line_Item__c = csli!=null?csli.Id:null;
                         invLI.ILI_Order__c = saLineItems[0].Service__r.Order__c;
@@ -421,11 +436,12 @@ global without sharing class massServicingInvoiceBatch implements Database.Batch
                         for(Database.Error err : srSalis[idx].getErrors()) 
                         {
                             errText = err.getMessage() + ' ';
-                        }        
+                        }    
+                        
                         Service_Appointment_Line_Item__c sali = salisToUpdate[idx];
                         if(!invoicesWithErrorIds.contains(invIdPerArIdMap.get(sali.Service_Appointment__r.Absence_Registration__c)))
                         {
-                            Invoice__c inv = new Invoice__c(Id=invIdPerArIdMap.get(sali.Service_Appointment__r.Absence_Registration__c),Status__c=StaticConstants.INVOICE_STATUS_ERROR,Error_reason__c=errText,Invoicing_On_Hold__c=true);
+                            Invoice__c inv = new Invoice__c(Id=invIdPerArIdMap.get(sali.Service_Appointment__r.Absence_Registration__c),Status__c=InvoiceManager.INVOICE_STATUS_ERROR,Error_reason__c=errText,Invoicing_On_Hold__c=true);
                             invoicesWithError.add(inv);
                             invoicesWithErrorIds.add(invIdPerArIdMap.get(sali.Service_Appointment__r.Absence_Registration__c));
                         }
@@ -470,7 +486,7 @@ global without sharing class massServicingInvoiceBatch implements Database.Batch
     global void finish(Database.BatchableContext bc)
     {
         //execute any post-processing operations
-        List<Invoice_Batch_Result__c> invoiceBatchResult = [SELECT Id FROM Invoice_Batch_Result__c WHERE Batch_Id__c =: bc.getJobId()]; 
+        List<Invoice_Batch_Result__c> invoiceBatchResult = [SELECT Id FROM Invoice_Batch_Result__c WHERE Batch_Id__c =: bc.getJobId() AND Status__c!='Failed']; 
         if(invoiceBatchResult.size()==1)
         {
             List<AggregateResult> aggR = [SELECT Status__c, count(Id) FROM Invoice__c WHERE Generated_by_batch__c=:invoiceBatchResult[0].Id GROUP BY Status__c];
@@ -480,11 +496,11 @@ global without sharing class massServicingInvoiceBatch implements Database.Batch
             for (AggregateResult ar : aggR)  {
                 String status = (String) ar.get('Status__c');
                 Integer countRec = (Integer) ar.get('expr0');
-                if(status==StaticConstants.INVOICE_STATUS_DRAFT)
+                if(status==InvoiceManager.INVOICE_STATUS_DRAFT)
                 {
                     draftCount = countRec;
                 }
-                else if(status==StaticConstants.INVOICE_STATUS_ERROR)
+                else if(status==InvoiceManager.INVOICE_STATUS_ERROR)
                 {
                     errorCount = countRec;
                 }

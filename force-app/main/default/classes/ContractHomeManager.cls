@@ -30,7 +30,7 @@ public class ContractHomeManager
 	public static Id mcmBeProductId{
         get{
             if(mcmBeProductId==null){
-                Id pId = [SELECT Id FROM Product2 WHERE ExtSysId__c='16000' LIMIT 1].Id;
+                Id pId = [SELECT Id FROM Product2 WHERE ExtSysId__c='16001' LIMIT 1].Id;
 				mcmBeProductId = pId;
             }
             return mcmBeProductId;
@@ -207,9 +207,7 @@ public class ContractHomeManager
 				else if(ct.RecordTypeId==mcmRtConventionBEId)
 				{
 					ct.Contract_Digit__c = conventionNumberBeMCM;
-					system.debug('AMU digit' + ct.Contract_Digit__c);
 					ct.Name = 'CONV-' + String.valueOf(ct.Contract_Digit__c).leftPad(5,'0');
-					system.debug('AMU name '+ ct.Name);
 				}
 				else{
 					String ctCountry =  ct.Contract_Country__c;
@@ -223,25 +221,6 @@ public class ContractHomeManager
 					}
 				}
 			}
-			// else if(ct.External_Id__c!=null)
-			// {
-			// 	if(ct.Name!=null && ct.Name.contains('-'))
-			// 	{
-			// 		Pattern MyPattern = Pattern.compile('[^-]*-([0-9]{1,})$');
-			// 		Matcher MyMatcher = MyPattern.matcher(ct.Name);
-			// 		if(MyMatcher.matches()){
-			// 			if(Integer.ValueOf(MyMatcher.group(1)) > 100000){
-			// 				ct.addError('A contract from mainframe can not be assigned a number greater than 100000.');
-			// 			}
-			// 		}
-			// 		else{
-			// 			ct.addError('Invalid contract name.');
-			// 		}
-			// 	}
-			// 	else {
-			// 		ct.addError('A contract from mainframe must have a name.');
-			// 	}
-			// }
 		}
 	}
 
@@ -251,6 +230,7 @@ public class ContractHomeManager
 	{
 		for(Contract_Home__c ctr : recordList)
 		{
+			//Fill Contract Start Date
 			if(ctr.In_Place_Date__c !=null)
 			{
 				ctr.Signature_Date__c = ctr.In_Place_Date__c;
@@ -259,7 +239,7 @@ public class ContractHomeManager
 					ctr.Version_start_date__c = ctr.In_Place_Date__c;
 				}
 			}
-
+			//Fill Product
 			if(ctr.Product__c==null) 
 			{
 				if(ctr.RecordTypeId==mcmRtBEId){
@@ -268,16 +248,45 @@ public class ContractHomeManager
 				else if(ctr.RecordTypeId==mcmRtOneshotBeId){
 					ctr.Product__c= mcmBeOneShotProductId;
 				}
-				else{
+				else if(ctr.RecordTypeId==mcmRtFRId){
 					ctr.Product__c = mcmFrProductId;
 				}
 			}
-
-			if(ctr.RecordTypeId==mcmRtOneshotBeId ){
+			//Default Service Type for One Shot
+			if(ctr.RecordTypeId==mcmRtOneshotBeId )
+			{
 				ctr.Service_Type__c='Medical check illness';
 			}
 		}
 		
+	}
+
+	/**************************************************************************************
+    * @author		Novera - QLE
+    * @date		    2021-10-08
+    * @description  OAPPMEDCHECK-850 Json Remuneration note to Scriptura : each doctor has his own counter. 
+	*               Copy invoice digit 
+    * @param		
+    **************************************************************************************/
+	public static void getDoctorInvoiceDigit(List<Contract_Home__c> recordList)
+	{
+		Set<Id> accIds = new Set<Id>();
+		Map<Id,Decimal> invoiceDigitPerDoctorMap = new Map<Id,Decimal>();
+		for(Contract_Home__c ctr : recordList)
+		{
+				accIds.add(ctr.Account__c);
+		}
+		if(accIds!=null)
+		{
+			for(AggregateResult ar:[SELECT Account__c, MAX(Invoice_Digit_Doctor__c) maxDigit FROM Contract_Home__c WHERE Account__c IN: accIds GROUP BY Account__c])
+			{
+				invoiceDigitPerDoctorMap.put(String.valueOf(ar.get('Account__c')),Integer.valueOf(ar.get('maxDigit')));
+			}
+			for(Contract_Home__c ctr : recordList)
+			{
+				ctr.Invoice_Digit_Doctor__c = invoiceDigitPerDoctorMap.get(ctr.Account__c)!=null?invoiceDigitPerDoctorMap.get(ctr.Account__c):0;
+			}
+		}
 	}
 
 	public static void createDefaultPricingLines(List<Contract_Home__c> recordList)
@@ -509,6 +518,7 @@ public class ContractHomeManager
 						if(onWhat=='on insert')
 						{
 							if(currentCtr.RecordTypeId==mcmRtOneshotBeId) currentCtr.addError(Label.ActiveContractOneShot);
+							else if(currentCtr.RecordTypeId==mcmRtConventionBEId || currentCtr.RecordTypeId==mcmRtConventionFRId) currentCtr.addError(Label.ActiveConvention);
 							else currentCtr.addError(Label.ActiveContractSameServiceType);
 						}
 						else if(onWhat=='on update') currentCtr.addError(Label.ActiveContractSameServiceTypeSpecifContract);
@@ -555,34 +565,37 @@ public class ContractHomeManager
 
         Set<Id> primaryIds = new Set<Id>();
         Set<Id> dunningRecicipentIds = new Set<Id>();
-		
-		for(Account acc : [SELECT Id,ParentId,Use_Official_Address_for_Correspondence__c
-					FROM Account WHERE Invoicing_On_This_Account__c='Yes' AND 
-					(( Specific_Contract__c=null AND ParentId IN:parentAccountIds) OR (Specific_Contract__c!=null AND Specific_Contract__c IN: specificContracts))])
-        {
-			if(acc.Use_Official_Address_for_Correspondence__c==TRUE) //correspondence address same as official
-            {
-            	primaryIds.add(acc.Id);
-            }
-            else //correspondence address different than official
-            {
-            	dunningRecicipentIds.add(acc.Id);
+		if( (parentAccountIds!= null && !parentAccountIds.isEmpty()) || (specificContracts!=null && !specificContracts.isEmpty()) )
+		{
+			for(Account acc : [SELECT Id,ParentId,Use_Official_Address_for_Correspondence__c
+						FROM Account WHERE Invoicing_On_This_Account__c='Yes' AND 
+						(( Specific_Contract__c=null AND ParentId IN:parentAccountIds) OR (Specific_Contract__c!=null AND Specific_Contract__c IN: specificContracts))])
+			{
+				if(acc.Use_Official_Address_for_Correspondence__c==TRUE) //correspondence address same as official
+				{
+					primaryIds.add(acc.Id);
+				}
+				else //correspondence address different than official
+				{
+					dunningRecicipentIds.add(acc.Id);
+				}
+				
 			}
-			
-        }
-        if(!Test.isRunningTest())
-        {  
-			System.debug('QLE ContractHomeManager sendAccountToSAP primaryIds ' + primaryIds);
-			System.debug('QLE ContractHomeManager sendAccountToSAP dunningRecicipentIds ' + dunningRecicipentIds);
-            //if correspondence address is not filled:send account as 'primary account's
-            if(!primaryIds.isEmpty()) AccountManager.sendAccountToSAP(primaryIds,'primaryAccount',insertOrUpdate,'Department');
-            /*if correspondence address is filled:
-                    - first send account as a 'dunning recipient', with id 'A||contractnbr||deptnr' to SAP with correspondence address
-                    - then, send account as 'primary account' with id 'contractnbr||deptnr' to SAP with official address
-                    - add its 'dunning recipient' in the record with id 'A||contractnbr||deptnr'
-            */
-            if(!dunningRecicipentIds.isEmpty()) AccountManager.sendAccountToSAP(dunningRecicipentIds,'dunningRecipient' ,insertOrUpdate,'Department');
-        }
+			if(!Test.isRunningTest())
+			{  
+				System.debug('QLE ContractHomeManager sendAccountToSAP primaryIds ' + primaryIds);
+				System.debug('QLE ContractHomeManager sendAccountToSAP dunningRecicipentIds ' + dunningRecicipentIds);
+				//if correspondence address is not filled:send account as 'primary account's
+				if(!primaryIds.isEmpty()) AccountManager.sendAccountToSAP(primaryIds,'primaryAccount',insertOrUpdate,'Department');
+				/*if correspondence address is filled:
+						- first send account as a 'dunning recipient', with id 'A||contractnbr||deptnr' to SAP with correspondence address
+						- then, send account as 'primary account' with id 'contractnbr||deptnr' to SAP with official address
+						- add its 'dunning recipient' in the record with id 'A||contractnbr||deptnr'
+				*/
+				if(!dunningRecicipentIds.isEmpty()) AccountManager.sendAccountToSAP(dunningRecicipentIds,'dunningRecipient' ,insertOrUpdate,'Department');
+			}
+
+		}
     }
 
 	/*******************************************************************************
@@ -594,7 +607,7 @@ public class ContractHomeManager
     * @return		voice
     ********************************************************************************/
     
-    public static void checkInvoicingRecipient(List<Contract_Home__c> recordList, Map<Id,Contract_Home__c> oldMap)
+	public static void checkInvoicingRecipient(List<Contract_Home__c> recordList, Map<Id,Contract_Home__c> oldMap)
     {
         Set<Id> invAccIds = new Set<Id>();
         List<Contract_Home__c> ctrToProcess = new List<Contract_Home__c>();
@@ -669,11 +682,12 @@ public class ContractHomeManager
     * @author		Novera - QLE
     * @date		    2020-04-13
     * @description  OAPPMEDCHECK-927 Yearly contribution invoice for Specific Contract
-    *               e
+    *               
     * @param	
     * @return		voice
     ********************************************************************************/
-    
+	/*
+	OAPPMEDCHECK-1212
     public static void createYearlyContributionInvoicing(List<Contract_Home__c> recordList, Map<Id,Contract_Home__c> oldMap)
     {   
 		Set<Id> ctrIds = new Set<Id>();
@@ -687,16 +701,22 @@ public class ContractHomeManager
 				ctrMap.put(ctr.Id,ctr);
 			}
 		}
-		csliList= [SELECT Contract_Home__c, Parent_contract_is_specific__c, Parent_Contract_RT__c, Is_From_Versioning__c, Is_From_Migration__c
-						, Service__c, PO_Number__c, Price_Rate_1__c
-				FROM Contractual_Service_Line_Item__c WHERE Contract_Home__c IN:ctrMap.keySet() 
-					AND Service__c =:ContractualServiceLineItemManager.annualFeeFrService.Id 
-					AND Is_From_Versioning__c=FALSE AND Is_From_Migration__c=FALSE
-					AND Id NOT IN (SELECT Contractual_Service_Line_Item__c FROM InvoiceLineItem__c WHERE RecordTypeId=:UtilsConstants.RT_ID_INVOICE_LINE_ITEM_MEDICAL_CONTROL
-					AND CreatedDate = THIS_YEAR)];
-		ContractualServiceLineItemManager.createYearlyContributionInvoicing(csliList,ctrMap);
+		if(!ctrMap.isEmpty())
+		{
+			csliList= [SELECT Contract_Home__c, Parent_contract_is_specific__c, Parent_Contract_RT__c, Is_From_Versioning__c, Is_From_Migration__c
+							, Service__c, PO_Number__c, Price_Rate_1__c
+					FROM Contractual_Service_Line_Item__c WHERE Contract_Home__c IN:ctrMap.keySet() 
+						AND Service__c =:ContractualServiceLineItemManager.annualFeeFrService.Id 
+						AND Is_From_Versioning__c=FALSE AND Is_From_Migration__c=FALSE
+						AND Id NOT IN (SELECT Contractual_Service_Line_Item__c FROM InvoiceLineItem__c WHERE RecordTypeId=:UtilsConstants.RT_ID_INVOICE_LINE_ITEM_MEDICAL_CONTROL
+						AND CreatedDate = THIS_YEAR)];
+			if(!csliList.isEmpty())
+			{
+				ContractualServiceLineItemManager.createYearlyContributionInvoicing(csliList,ctrMap);
+			}
+		}
     }
-
+	*/
 
 	/*******************************************************************************
     * @author		SLALA
@@ -820,43 +840,142 @@ public class ContractHomeManager
     ********************************************************************************/
 	public static void fillSpecificVATNumber(List<Contract_Home__c> recordList)
 	{
-		//Set<Id> chIds = new Set<Id>();
-
-		//Account account = new Account([SELECT Id,  Official_Country__c, Official_PostalCode__c FROM Account WHERE Id IN :chIds]);
-
 		for(Contract_Home__c ch : recordList)
 		{
-/* 			Account acc = new Account(Id= account.id);
-			if(acc.Official_Country__c=='FRA')
-			{
-				if(LEFT(acc.Official_PostalCode__c,3)=-'973' || LEFT(acc.Official_PostalCode__c,3)=='976' )
-				{
-					ch.Specific_VAT_Picklist__c ='0.00%';
-				}
-				else if(LEFT(acc.Official_PostalCode__c,3)=='971' || LEFT(acc.Official_PostalCode__c,3)=='972' || 
-						LEFT(acc.Official_PostalCode__c,3)=='975') //???? || LEFT(acc.Official_PostalCode__c,3)='976')
-				{
-					ch.Specific_VAT_Picklist__c ='8.50%';
-					
-				}
-				else
-				{
-					ch.Specific_VAT_Picklist__c ='20.00%';
-
-				}
-			}
-			else if(acc.Official_Country__c=='BEL')
-			{
-				ch.Specific_VAT_Picklist__c ='0.00%';
-
-			} */
-
 			if(ch.Specific_VAT_Picklist__c !=null)
 			{
 				Integer result = ch.Specific_VAT_Picklist__c.indexOf('%');
 				String s2 =ch.Specific_VAT_Picklist__c.left(result);
 				ch.Specific_TVA__c = Decimal.valueof(s2); 
 			}
+		}
+	}
+
+	//OAPPMEDCHECK-952
+	public static void MCMfillSpecificVATPicklist(List<Contract_Home__c> recordList)
+	{
+		Set<Id> accountIds = new Set<Id>();
+		for(Contract_Home__c ctr : recordList)
+		{
+			if(ctr.Account__c != null)
+			{
+				accountIds.add(ctr.Account__c);
+			}
+		}
+		if(accountIds != null && !accountIds.isEmpty())
+		{
+			Map<Id, Account> accountsByIdMap = new Map<Id, Account>([SELECT Id,  Official_Country__c, Official_PostalCode__c, Subject_to_VAT__c, VAT_Number__c
+																	 FROM Account WHERE Id IN :accountIds]);
+		
+			for(Contract_Home__c ch : recordList)
+			{
+				if(accountsByIdMap.containsKey(ch.Account__c))
+				{
+					Account acc = accountsByIdMap.get(ch.Account__c);
+					if(ch.RecordTypeId==mcmRtFRId)
+					{
+						 // updated by OAPPMEDCHECK-1021
+						if(acc.Official_Country__c=='FRA')
+						{
+							ch.Specific_VAT_Picklist__c ='20.00%';
+						}
+						else if(acc.Official_Country__c=='GUF' || acc.Official_Country__c=='MYT')
+						{
+							ch.Specific_VAT_Picklist__c ='0.00%';
+						}
+						else if(acc.Official_Country__c=='GLP' ||acc.Official_Country__c=='MTQ'
+								||acc.Official_Country__c=='REU'|| acc.Official_Country__c=='SPM')
+						{
+							ch.Specific_VAT_Picklist__c ='8.50%';
+						}
+						else if(InvoiceManager.europeanCountries.contains(acc.Official_Country__c))
+						{
+							if(acc.VAT_Number__c!=null)
+							{
+								ch.Specific_VAT_Picklist__c ='0.00%';
+							}
+							else 
+							{
+								ch.Specific_VAT_Picklist__c ='20.00%';
+							}
+						}
+						else 
+						{
+							ch.Specific_VAT_Picklist__c ='0.00%';
+						}
+					}
+
+					else if(ch.RecordTypeId==mcmRtConventionFRId) // - updated by OAPPMEDCHECK-1021
+					{
+						if(acc.Official_Country__c=='FRA')
+						{
+							if(acc.Subject_to_VAT__c==true)
+							{
+								ch.Specific_VAT_Picklist__c ='20.00%';
+							}
+							else
+							{
+								ch.Specific_VAT_Picklist__c ='0.00%';
+							}
+						}
+						else if(acc.Official_Country__c=='GUF' || acc.Official_Country__c=='MYT')
+						{
+							ch.Specific_VAT_Picklist__c ='0.00%';
+						}
+						else if(acc.Official_Country__c=='GLP' ||acc.Official_Country__c=='MTQ'
+						||acc.Official_Country__c=='REU'|| acc.Official_Country__c=='SPM')
+						{
+							if(acc.Subject_to_VAT__c==true)
+							{
+								ch.Specific_VAT_Picklist__c ='8.50%';
+							}
+							else
+							{
+								ch.Specific_VAT_Picklist__c ='0.00%';
+							}
+						}
+						else if(InvoiceManager.europeanCountries.contains(acc.Official_Country__c))
+						{
+							if(acc.Subject_to_VAT__c==true && acc.VAT_Number__c!=null)
+								{
+									ch.Specific_VAT_Picklist__c ='0.00%';
+								}
+								else 
+								{
+									ch.Specific_VAT_Picklist__c ='20.00%';
+								}
+							}
+						else
+						{
+							ch.Specific_VAT_Picklist__c ='20.00%';
+						}
+					}
+					fillSpecificVATNumber(recordList);
+				}
+			}
+		}
+	}
+
+	public static void checkZipCodeAgainstCountry(List<Contract_Home__c> contractHomes){
+		//Author     : Jan Selis, Synergy2core BVBA
+		//Company    : 4C Consulting NV, Mechelen
+		//Date       : 2014-03-05
+		//Description: check zip code against country for invoice address
+		//             Uses clsPostCode
+		for (Contract_Home__c ch : contractHomes) ch.Validation_Warning_Msg__c = null;
+		for (Contract_Home__c ch : contractHomes) clsCountryValidation.handleValidation ('ZIP', (SObject)(Trigger.isUpdate?Trigger.oldMap.get(ch.Id):null), (SObject)ch, 'Contract_Postal_Code__c', 'Contract_Country__c', 'Validation_Warning_Msg__c');
+
+	}
+	public static void fillPicklistFieldUpdates(List<Contract_Home__c> contractHomes){
+
+		//Author      :  Jan Selis, Synergy2core BVBA for 4C Consulting, Stationsstraat 60/5, 2800 Mechelen
+		//Date        :  2013-10-30
+		//Description :  trigger to work around the restriction of workflow field updates that they cannot copy a value into a picklist field (without writing a separate
+		//               WF rule for each picklist value).
+
+		for (Contract_Home__c ch : contractHomes) {
+			if (ch.Contract_Country_Txt__c != null){ ch.Contract_Country__c = ch.Contract_Country_Txt__c; ch.Contract_Country_Txt__c = null;}
+			if (ch.Contract_Language_Txt__c != null){ ch.Contract_Language__c = ch.Contract_Language_Txt__c; ch.Contract_Language_Txt__c = null;}
 		}
 	}
 }

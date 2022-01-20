@@ -12,10 +12,11 @@ public class ServiceAppointmentManager
     public static final String REMUNERATION_STATUS_INVOICE_DETAIL_LINE_ERROR = 'Error during Invoice Detail Lines';
     public static final String REMUNERATION_STATUS_NO_REMUNERATION = 'No remuneration';
     public static final String REMUNERATION_STATUS_REMUNERATION_NOTE_CREATED = 'Remuneration note created';
-    
+
     public static final String STATUS_RESULT_TO_CUSTOMER = 'Result to customer';
     public static final String STATUS_CHECK_COMPLETED = 'Completed';
     public static final String STATUS_SCHEDULED = 'Scheduled';
+    public static final String STATUS_DISPATCHED = 'Dispatched';
     public static final String STATUS_CANNOT_COMPLETE = 'Cannot Complete';
     public static final String INVOICING_STATUS_INVOICE_DETAIL_LINE_TO_GENERATE = 'Invoice Detail Lines to generate';
     public static final String INVOICING_STATUS_INVOICE_DETAIL_LINE_GENERATED = 'Invoice Detail Lines generated';
@@ -35,12 +36,14 @@ public class ServiceAppointmentManager
     public static final String OP_CONCLUSION_NOT_IN_LEAVE = 'Salarié pas en arrêt de travail';
     public static final String OP_CONCLUSION_NO_SHOW = 'Salarié non présenté au cabinet';
 
+    public static final String VISIT_TYPE_DOUBLE_PASSAGE = 'Double Passage';
+
     public static final String QUEUE_MCM_iNVOICE_FR = 'MCM_INVOICE_FR';    
     public static final String COUNTRY_FR = 'FR';
 
     public static final String INVOICE_DETAIL_LINE_CN_TYPE = 'Credit Note - Customer Invoicing';
-	public static final String INVOICE_DETAIL_LINE_REMUNERATION_TYPE = 'Doctor Remuneration';
-	public static final String INVOICE_DETAIL_LINE_CI_TYPE = 'Customer Invoicing';
+    public static final String INVOICE_DETAIL_LINE_REMUNERATION_TYPE = 'Doctor Remuneration';
+    public static final String INVOICE_DETAIL_LINE_CI_TYPE = 'Customer Invoicing';
 
     public static final String SERVICE_IDENTIFICATOR_HOME_VISIT = 'Home visit';
     public static final String SERVICE_IDENTIFICATOR_CONVOCATION = 'Convocation';
@@ -52,12 +55,12 @@ public class ServiceAppointmentManager
     public static final String SERVICE_IDENTIFICATOR_SMS = 'SMS';
     public static final String SERVICE_IDENTIFICATOR_MISC = 'Miscellaneous';
 
-    public static final String WORKYPE_FR_HV = 'Visite à domicile sans convocation';
-    public static final String WORKYPE_FR_HV_Conv = 'Visite à domicile avec convocation potentielle';
-    public static final String WORKYPE_FR_CONV_HV = 'Convocation après visite à domicile';
-    public static final String WORKYPE_FR_CONV = 'Convocation directe';
-    public static final String WORKYPE_FR_ARBITRAGE = 'Arbitrage';
-    public static final String WORKYPE_FR_EXPERTISE = 'Expertise';
+    public static final String WORKTYPE_FR_HV = 'Home_Visit_without_Convocation';
+    public static final String WORKTYPE_FR_HV_CONV = 'Home_Visit_with_Potential_Convocation';
+    public static final String WORKTYPE_FR_CONV_HV = 'Convocation_After_Home_Visit';
+    public static final String WORKTYPE_FR_CONV = 'Direct_Convocation';
+    public static final String WORKTYPE_FR_ARBITRAGE = 'Arbitrage';
+    public static final String WORKTYPE_FR_EXPERTISE = 'Expertise';
 
 
 
@@ -72,7 +75,6 @@ public class ServiceAppointmentManager
                     zipCodeMap.put(zc.Name,zc.Id);
                 }
                 ZipCodeIdPerNameMap=ZipCodeMap;
-                system.debug('AMUzipmap' +ZipCodeIdPerNameMap);
             }
             return ZipCodeIdPerNameMap;
         }
@@ -201,33 +203,57 @@ public class ServiceAppointmentManager
     ********************************************************************************/
     public static void fillDoctorConvention(List<ServiceAppointment> recordList, Map<Id,ServiceAppointment> oldMap)
     {   
-        Set<Id> servResIds = new Set<Id>();
-        Map<Id,List<ServiceAppointment>> saListPerServResMap = new Map<Id,List<ServiceAppointment>>();
+        List<ServiceAppointment> saToProcess = new List<ServiceAppointment>();
+        Set<Id> srIds = new Set<Id>();
+        Map<Id,Id> doctorAccIdPerServResIdMap = new Map<Id,Id>();
+        Set<Id> doctorAccIds = new Set<Id>();
+        Map<Id,Id> convIdPerDocAccIdMap = new Map<Id,Id>();
         for(ServiceAppointment sa : recordList)
         {
-            if( (sa.Assigned_Resource__c!=null && sa.Assigned_Resource__c!=oldMap.get(sa.Id).Assigned_Resource__c)
-                || (sa.Assigned_Resource__c!=null && sa.Assigned_Resource__c==oldMap.get(sa.Id).Assigned_Resource__c && sa.Doctor_Convention__c==null))
+            if(sa.Assigned_Resource__c==null)
             {
-                if(saListPerServResMap.containsKey(sa.Assigned_Resource__c))
+                sa.Doctor_Convention__c=null;
+            }
+            else
+            {
+                if((sa.Assigned_Resource__c!=oldMap.get(sa.Id).Assigned_Resource__c)
+                || (sa.Assigned_Resource__c==oldMap.get(sa.Id).Assigned_Resource__c && sa.Doctor_Convention__c==null))
                 {
-                    List<ServiceAppointment> saList = saListPerServResMap.get(sa.Assigned_Resource__c);
-                    saList.add(sa);
-                    saListPerServResMap.put(sa.Assigned_Resource__c, saList);
-                }
-                else
-                {
-                    saListPerServResMap.put(sa.Assigned_Resource__c, new List<ServiceAppointment>{sa});
+                    srIds.add(sa.Assigned_Resource__c);
+                    saToProcess.add(sa);
                 }
             }
         }
-        if(saListPerServResMap.keySet()!=null && !saListPerServResMap.keySet().isEmpty())
+        if(!srIds.isEmpty())
         {
-            for(Contract_Home__c conv : [SELECT Id, Service_Resource__c FROM Contract_Home__c WHERE Service_Resource__c IN:saListPerServResMap.keySet() AND RecordTypeId =:ContractHomeManager.mcmRtConventionFRId AND Active__c=TRUE])
+            for(ServiceResource sr : [SELECT Id, AccountId FROM ServiceResource WHERE Id IN:srIds])
             {
-                for(ServiceAppointment sa : saListPerServResMap.get(conv.Service_Resource__c))
+                doctorAccIdPerServResIdMap.put(sr.Id,sr.AccountId);
+                doctorAccIds.add(sr.AccountId);
+            }
+            if(!doctorAccIds.isEmpty())
+            {
+                for(Contract_Home__c conv : [SELECT Id, Account__c FROM Contract_Home__c WHERE Account__c IN:doctorAccIds AND Active__c=TRUE AND (RecordTypeId =:ContractHomeManager.mcmRtConventionFRId OR RecordTypeId =:ContractHomeManager.mcmRtConventionBEId)])
                 {
-                    sa.Doctor_Convention__c = conv.Id;
+                    convIdPerDocAccIdMap.put(conv.Account__c,conv.Id);
                 }
+            }
+        }
+        System.debug('QLE convIdPerDocAccIdMap ' + convIdPerDocAccIdMap); 
+        for(ServiceAppointment sa : saToProcess)
+        {
+            if(doctorAccIdPerServResIdMap.containsKey(sa.Assigned_Resource__c))
+            {
+                System.debug('QLE doctorAccIdPerServResIdMap.containsKey(sa.Assigned_Resource__c) '); 
+                if(convIdPerDocAccIdMap.containsKey(doctorAccIdPerServResIdMap.get(sa.Assigned_Resource__c)))
+                {
+                    System.debug('QLE convIdPerDocAccIdMap.containsKey(doctorAccIdPerServResIdMap.get(sa.Assigned_Resource__c)) '); 
+                    sa.Doctor_Convention__c = convIdPerDocAccIdMap.get(doctorAccIdPerServResIdMap.get(sa.Assigned_Resource__c));
+                }
+            }
+            else
+            {
+                sa.Doctor_Convention__c = null;
             }
         }
     }
@@ -243,6 +269,7 @@ public class ServiceAppointmentManager
     ********************************************************************************/
     public static void createInvoiceDetailLine(List<ServiceAppointment> recordList, Map<Id,ServiceAppointment> oldMap)
     {
+        System.debug('QLE createInvoiceDetailLine ');
         Map<Id,ServiceAppointment> saToProcessForInvoice = new Map<Id,ServiceAppointment>();
         Map<Id,Id> ctrIdPersaId= new Map<Id,Id>();
         Set<Id> ctrIdSet = new Set<Id>();
@@ -303,6 +330,7 @@ public class ServiceAppointmentManager
             List<Service_Appointment_Line_Item__c> saliListToInsert = new List<Service_Appointment_Line_Item__c>(); //invoice detail lines to insert
             contractInfoForInvoicing info = getcontractInfoForInvoicing(ctrIdSet);
             Map<Id,Map<Id,Decimal>> pricePerServIdPerCtrId = info.pricePerServIdPerCtrId; //Get negotiated price from CSLI 
+            Set<Id> csliWithPrivilegedPack = info.csliWithPrivilegedPack;
             System.debug('QLE pricePerServIdPerCtrId ' + pricePerServIdPerCtrId);
             Map<Id,Decimal> kmInForfaitPerCtrId = info.kmInForfaitPerCtrId; 
             
@@ -328,59 +356,66 @@ public class ServiceAppointmentManager
             for(ServiceAppointment sa : saToProcessForInvoice.values())
             {       
                 try{
+                    System.debug('QLE HERE');
                     Map<Id,Decimal> pricePerServId = pricePerServIdPerCtrId.get(sa.Contract_Home__c); 
-
                     if(pricePerServId==null || pricePerServId.isEmpty())
                     {
                         throw new CustomException(Label.CanNotFindPriceInContract);
                     }
-    
-                    //Mileage invoicing
-                    if(sa.Km_mountain__c!=null || sa.Km_Flat__c!=null)
+                    if(!csliWithPrivilegedPack.contains(sa.Contractual_Service_Line_Item__c))
                     {
-                        saliListToInsert.addAll(mileageInvoicing(sa,kmInForfaitPerCtrId,servicePerVisitTypeMapFR,pricePerServId,false));
+                        //Visit invoicing
+                        saliListToInsert.addAll(visitInvoicing(sa,servicePerVisitTypeMapFR,pricePerServId,false));
+    
+                        //Communication Invoicing
+                        //SMS
+                        if(numOfSmsToInvoicePerSaIdMap.get(sa.Id) > 0)
+                        {
+                            Id sSmsEmplId = getServiceIdFromPricing(servicePerVisitTypeMapFR,SERVICE_IDENTIFICATOR_SMS);
+                            for(Integer i=0;i<numOfSmsToInvoicePerSaIdMap.get(sa.Id);i++)
+                            {
+                                if(sa.No_Invoice__c)
+                                {
+                                    saliListToInsert.add(createSALI(sa.Id,sa.Contract_Home__c,sSmsEmplId,null,0,null,false));
+                                }
+                                else 
+                                {  
+                                    saliListToInsert.add(createSALI(sa.Id,sa.Contract_Home__c,sSmsEmplId,null,null,pricePerServId,false));
+                                }
+                            }
+                        }
+                        //Convocation Letter
+                        if(numOfLetterToInvoicePerSaIdMap.get(sa.Id) > 0)
+                        {
+                            Id sLetterEmplId = getServiceIdFromPricing(servicePerVisitTypeMapFR,SERVICE_IDENTIFICATOR_LETTER);
+                            for(Integer i=0;i<numOfLetterToInvoicePerSaIdMap.get(sa.Id);i++)
+                            {
+                                if(sa.No_Invoice__c)
+                                {
+                                    saliListToInsert.add(createSALI(sa.Id,sa.Contract_Home__c,sLetterEmplId,null,0,null,false));
+                                }
+                                else
+                                {
+                                    saliListToInsert.add(createSALI(sa.Id,sa.Contract_Home__c,sLetterEmplId,null,null,pricePerServId,false));
+                                }
+                            }
+                        }
+                        //Miscellaneous OAPPMEDCHECK-657
+                        if(sa.Montant_Frais_divers__c!=null)
+                        {
+                            saliListToInsert.addAll(miscellaneousInvoicing(sa,servicePerVisitTypeMapFR,false));                                                                  
+                        }
+                        
                     }
 
-                    //Visit invoicing
-                    saliListToInsert.addAll(visitInvoicing(sa,servicePerVisitTypeMapFR,pricePerServId,false));
-   
-                    //Communication Invoicing
-                    //SMS
-                    if(numOfSmsToInvoicePerSaIdMap.get(sa.Id) > 0)
+                    //Mileage invoicing
+                    if(sa.Km_mountain__c==null && sa.Km_Flat__c==null)
                     {
-                        Id sSmsEmplId = getServiceIdFromPricing(servicePerVisitTypeMapFR,SERVICE_IDENTIFICATOR_SMS);
-                        for(Integer i=0;i<numOfSmsToInvoicePerSaIdMap.get(sa.Id);i++)
-                        {
-                            if(sa.No_Invoice__c)
-                            {
-                                saliListToInsert.add(createSALI(sa.Id,sa.Contract_Home__c,sSmsEmplId,null,0,null,false));
-                            }
-                            else 
-                            {  
-                                saliListToInsert.add(createSALI(sa.Id,sa.Contract_Home__c,sSmsEmplId,null,null,pricePerServId,false));
-                            }
-                        }
+                        if(csliWithPrivilegedPack.contains(sa.Contractual_Service_Line_Item__c)) saInvoicingStatus.put(sa.Id,INVOICING_STATUS_PREPAYMENT);  
                     }
-                    //Convocation Letter
-                    if(numOfLetterToInvoicePerSaIdMap.get(sa.Id) > 0)
+                    else 
                     {
-                        Id sLetterEmplId = getServiceIdFromPricing(servicePerVisitTypeMapFR,SERVICE_IDENTIFICATOR_LETTER);
-                        for(Integer i=0;i<numOfLetterToInvoicePerSaIdMap.get(sa.Id);i++)
-                        {
-                            if(sa.No_Invoice__c)
-                            {
-                                saliListToInsert.add(createSALI(sa.Id,sa.Contract_Home__c,sLetterEmplId,null,0,null,false));
-                            }
-                            else
-                            {
-                                saliListToInsert.add(createSALI(sa.Id,sa.Contract_Home__c,sLetterEmplId,null,null,pricePerServId,false));
-                            }
-                        }
-                    }
-                    //Miscellaneous OAPPMEDCHECK-657
-                    if(sa.Montant_Frais_divers__c!=null)
-                    {
-                        saliListToInsert.addAll(miscellaneousInvoicing(sa,servicePerVisitTypeMapFR,false));                                                                  
+                        saliListToInsert.addAll(mileageInvoicing(sa,kmInForfaitPerCtrId,servicePerVisitTypeMapFR,pricePerServId,false));
                     }
                 }
                 catch(Exception e)
@@ -399,6 +434,7 @@ public class ServiceAppointmentManager
                     saInvoicingStatus.put(sa.Id,'E');  
                 }
             }
+            System.debug('QLE saliListToInsert' + saliListToInsert);
             if(!saliListToInsert.isEmpty())
             {
                 saliSaveResult insertResult = insertSaliList(saToProcessForInvoice.keySet(),saliListToInsert);
@@ -406,6 +442,7 @@ public class ServiceAppointmentManager
                 errorTaskToInsert.addAll(insertResult.taskToInsert);
             }
         }
+        System.debug('QLE saInvoicingStatus' + saInvoicingStatus);
         if(saInvoicingStatus!=null && !saInvoicingStatus.isEmpty()) setInvoicingStatus(saInvoicingStatus);
         if(!errorTaskToInsert.isEmpty())  Database.insert(errorTaskToInsert,false);
 
@@ -439,6 +476,7 @@ public class ServiceAppointmentManager
                 || (sa.No_Honoraria__c==false && oldMap.get(sa.Id).No_Honoraria__c==true) 
             )                   
             {
+                System.debug('QLE sa.Doctor_Convention__c ' + sa.Doctor_Convention__c); 
                 if(sa.Doctor_Convention__c!=null)
                 {
                     convIdSet.add(sa.Doctor_Convention__c);
@@ -500,20 +538,21 @@ public class ServiceAppointmentManager
                     throw new CustomException(Label.CanNotFindPriceInConvention);
                 }
     
+                //Visit invoicing
+                saliListToInsert.addAll(visitInvoicing(sa,servicePerVisitTypeMapFR,pricePerServId,true));
+                
                 //Mileage invoicing
                 if(sa.Km_mountain__c!=null || sa.Km_Flat__c!=null)
                 {
                     saliListToInsert.addAll(mileageInvoicing(sa,kmInForfaitPerConvId,servicePerVisitTypeMapFR,pricePerServId,true));
                 }
                 
-                //Visit invoicing
-                saliListToInsert.addAll(visitInvoicing(sa,servicePerVisitTypeMapFR,pricePerServId,true));
 
                 //Miscellaneous OAPPMEDCHECK-657
                 if(sa.Montant_Frais_divers__c!=null)saliListToInsert.addAll(miscellaneousInvoicing(sa,servicePerVisitTypeMapFR,true));
 
                 //OAPPMEDCHECK-749
-                if(sa.Extra_remuneration__c!=null) saliListToInsert.addAll(extraRemuneration(sa,servicePerVisitTypeMapFR,true));
+                //if(sa.Extra_remuneration__c!=null) saliListToInsert.addAll(extraRemuneration(sa,servicePerVisitTypeMapFR,true));
             }
             catch(Exception e)
             {
@@ -555,8 +594,6 @@ public class ServiceAppointmentManager
         {
             Id convId = sa.Doctor_Convention__c;
             kmInForfait = kmInForfaitPerCtrId.get(convId);
-            pricePerMoutainKm = getPriceFromContract(pricePerServId,mountainKmServiceId,isForRemuneration);
-            pricePerFlatKm = getPriceFromContract(pricePerServId,flatKmServiceId,isForRemuneration);
             if(kmInForfait > 0)
             {
                 if(sa.Km_mountain__c!=null && sa.Km_mountain__c > kmInForfait)
@@ -572,6 +609,15 @@ public class ServiceAppointmentManager
                         Decimal kmTotal = sa.Km_mountain__c + sa.Km_flat__c;
                         if(kmTotal > kmInforfait){
                             kmFlatToInvoice = kmTotal - kmInforfait;
+                        }                               
+                    }
+                }
+                else 
+                {
+                    if(sa.Km_flat__c!=null && sa.Km_flat__c > 0)
+                    {
+                        if(sa.Km_flat__c > kmInforfait){
+                            kmFlatToInvoice = sa.Km_flat__c - kmInforfait;
                         }                               
                     }
                 }
@@ -607,6 +653,16 @@ public class ServiceAppointmentManager
                         }                               
                     }
                 }
+                else
+                {
+                    if(sa.Km_mountain__c!=null && sa.Km_mountain__c > 0)
+                    {
+                        if(sa.Km_mountain__c > kmInforfait)
+                        {
+                            kmMountainToInvoice = sa.Km_mountain__c - kmInforfait;
+                        }                               
+                    }
+                }
             }
             else
             {
@@ -617,6 +673,7 @@ public class ServiceAppointmentManager
         if(kmMountainToInvoice >0)
         {
             Decimal amt;
+            pricePerMoutainKm = getPriceFromContract(pricePerServId,mountainKmServiceId,isForRemuneration);
             if( (isForRemuneration && sa.No_Honoraria__c) || (!isForRemuneration && sa.No_Invoice__c)){
                 amt=0;
             }
@@ -624,13 +681,21 @@ public class ServiceAppointmentManager
                 amt=kmMountainToInvoice*pricePerMoutainKm;
             }
             Service_Appointment_Line_Item__c saliToCreate = createSALI(sa.Id,sa.Contract_Home__c,mountainKmServiceId,null,amt,pricePerServId,isForRemuneration);
-            saliToCreate.TECH_Km__c=sa.No_Invoice__c?0:kmMountainToInvoice;
+            if(isForRemuneration)
+            {
+                saliToCreate.TECH_Km__c=sa.No_Honoraria__c?0:kmMountainToInvoice;
+            }
+            else
+            {
+                saliToCreate.TECH_Km__c=sa.No_Invoice__c?0:kmMountainToInvoice;
+            }
             saliListToInsert.add(saliToCreate);
         }
     
         if(kmFlatToInvoice >0)
         {
             Decimal amt;
+            pricePerFlatKm = getPriceFromContract(pricePerServId,flatKmServiceId,isForRemuneration);
             if( (isForRemuneration&& sa.No_Honoraria__c) || (!isForRemuneration && sa.No_Invoice__c)){
                 amt=0;
             }
@@ -638,7 +703,14 @@ public class ServiceAppointmentManager
                 amt=kmFlatToInvoice*pricePerFlatKm;
             }
             Service_Appointment_Line_Item__c saliToCreate = createSALI(sa.Id,sa.Contract_Home__c,flatKmServiceId,null,amt,pricePerServId,isForRemuneration);
-            saliToCreate.TECH_Km__c=sa.No_Invoice__c?0:kmFlatToInvoice;
+            if(isForRemuneration)
+            {
+                saliToCreate.TECH_Km__c=sa.No_Honoraria__c?0:kmFlatToInvoice;
+            }
+            else
+            {
+                saliToCreate.TECH_Km__c=sa.No_Invoice__c?0:kmFlatToInvoice;
+            }
             saliListToInsert.add(saliToCreate);
         }
         return saliListToInsert; 
@@ -663,8 +735,8 @@ public class ServiceAppointmentManager
             {
                 saliListToInsert.add(createSALI(sa.Id,ctrHomeId,sHomeVisitId,null,null,pricePerServId,isForRemuneration));
             }
-            //Weekend Supplement
-            if(sa.Date_Time_Home_Visit__c!=null) dayOfWeek = sa.Date_Time_Home_Visit__c!=null?sa.Date_Time_Home_Visit__c.format('EEEE'):null;
+ 
+            if(sa.Weekend_Supplement__c&&sa.Date_Time_Home_Visit__c!=null) dayOfWeek = sa.Date_Time_Home_Visit__c!=null?sa.Date_Time_Home_Visit__c.format('EEEE'):null;
         }
         //Convocation Invoicing
         else if(sa.Convocation__c==true)
@@ -678,12 +750,11 @@ public class ServiceAppointmentManager
             {
                 saliListToInsert.add(createSALI(sa.Id,ctrHomeId,sOfficeVisitId,null,null,pricePerServId,isForRemuneration));
             }
-            //Weekend Supplement
-            if(sa.Date_Time_convocation__c!=null) dayOfWeek = sa.Date_Time_convocation__c.format('EEEE');
+            if(sa.Weekend_Supplement__c&&sa.Date_Time_convocation__c!=null) dayOfWeek = sa.Date_Time_convocation__c.format('EEEE');
         }
-        if((dayOfWeek=='Saturday'||dayOfWeek=='Sunday') && !isForRemuneration)
+        if(sa.Weekend_Supplement__c && (dayOfWeek=='Saturday'||dayOfWeek=='Sunday')) //OAPPMEDCHECK-941
         {
-            if(sa.No_Invoice__c)
+            if((isForRemuneration && sa.No_Honoraria__c) || (!isForRemuneration && sa.No_Invoice__c))
             {
                 saliListToInsert.add(createSALI(sa.Id,ctrHomeId,sWeekendId,null,0,null,isForRemuneration));
 
@@ -713,6 +784,8 @@ public class ServiceAppointmentManager
         return saliListToInsert; 
     }
 
+    /*
+    OAPPMEDCHECK-941
     public static List<Service_Appointment_Line_Item__c> extraRemuneration(ServiceAppointment sa,Map<String,Id> servicePerVisitTypeMapFR,Boolean isForRemuneration)
     {
         //OAPPMEDCHECK-749
@@ -728,6 +801,7 @@ public class ServiceAppointmentManager
         saliListToInsert.add(createSALI(sa.Id,sa.Doctor_Convention__c,sWeekendId,null,amt,null,isForRemuneration));                                                                    
         return saliListToInsert; 
     }
+    */
 
     public static  saliSaveResult  insertSaliList(Set<Id> saWithoutError,List<Service_Appointment_Line_Item__c> saliListToInsert)
     {
@@ -759,14 +833,17 @@ public class ServiceAppointmentManager
         saliSR.taskToInsert = errorTaskToInsert;
         return saliSR;
     }
+    
 
     public static contractInfoForInvoicing getContractInfoForInvoicing(Set<Id> ctrIdSet)
     {
         contractInfoForInvoicing info = new contractInfoForInvoicing();
         Map<Id,Decimal> kmInForfaitPerCtrId = new Map<Id,Decimal>(); 
         Map<Id,Map<Id,Decimal>> pricePerServIdPerCtrId = new Map<Id,Map<Id,Decimal>>();
-        for(Contract_Home__c ctr : [SELECT Id, Amount_of_km_in_forfait__c, Service_Resource__c
-                                        ,(SELECT Price_Rate_1__c, Service__c FROM Contractual_Service_Line_Items__r)
+        //Set<Id> ctrWithPrivilegedPack = new Set<Id>(); 
+        Set<Id> csliWithPrivilegedPack = new Set<Id>(); 
+        for(Contract_Home__c ctr : [SELECT Id, Amount_of_km_in_forfait__c
+                                        ,(SELECT Price_Rate_1__c, Service__c, Service__r.Pack_Type__c FROM Contractual_Service_Line_Items__r)
                                     FROM Contract_Home__c WHERE Id IN:ctrIdSet])
         {
             if(ctr.Amount_of_km_in_forfait__c!=null)
@@ -780,12 +857,14 @@ public class ServiceAppointmentManager
             Map<Id,Decimal> pricePerServiceId = new Map<Id,Decimal>();
             for(Contractual_Service_Line_Item__c csli : ctr.Contractual_Service_Line_Items__r)
             {
-            pricePerServiceId.put(csli.Service__c,csli.Price_Rate_1__c);
+                pricePerServiceId.put(csli.Service__c,csli.Price_Rate_1__c);
+                if(csli.Service__r.Pack_Type__c=='Privileged') csliWithPrivilegedPack.add(csli.Id);
             }
             pricePerServIdPerCtrId.put(ctr.Id,pricePerServiceId);
         }
         info.kmInForfaitPerCtrId = kmInForfaitPerCtrId;
         info.pricePerServIdPerCtrId = pricePerServIdPerCtrId;
+        info.csliWithPrivilegedPack = csliWithPrivilegedPack;
         return info;
     }
 
@@ -811,10 +890,17 @@ public class ServiceAppointmentManager
                     saIds.add(sa.Id);
                 }
             }
-            else{
+            else if(statusPerSaIds.get(sa.Id)=='E')
+            {
                 sa.Invoicing_Status__c=INVOICING_STATUS_INVOICE_DETAIL_LINE_ERROR;
                 sa.Invoicing_On_Hold__c = true;
                 saList.add(sa);
+            }
+            else
+            {
+                sa.Invoicing_Status__c = statusPerSaIds.get(sa.Id); 
+                saList.add(sa);
+                saIds.add(sa.Id);
             }
         }
         if(!saList.isEmpty()) update saList;
@@ -986,8 +1072,14 @@ public class ServiceAppointmentManager
             if((sa.Status==STATUS_RESULT_TO_CUSTOMER && oldMap.get(sa.Id).Status!=STATUS_RESULT_TO_CUSTOMER)
             || (sa.Status==STATUS_CANNOT_COMPLETE && oldMap.get(sa.Id).Status!=STATUS_CANNOT_COMPLETE))
             {                
-                sa.Invoicing_Status__c = INVOICING_STATUS_INVOICE_DETAIL_LINE_TO_GENERATE;
-                sa.Remuneration_Status__c = REMUNERATION_STATUS_INVOICE_DETAIL_LINE_TO_GENERATE;
+                if(sa.Invoicing_Status__c!=INVOICING_STATUS_INVOICE_DETAIL_LINE_GENERATED)
+                {
+                    sa.Invoicing_Status__c = INVOICING_STATUS_INVOICE_DETAIL_LINE_TO_GENERATE;
+                }
+                if(sa.Remuneration_Status__c!=REMUNERATION_STATUS_INVOICE_DETAIL_LINE_GENERATED)
+                {
+                    sa.Remuneration_Status__c = REMUNERATION_STATUS_INVOICE_DETAIL_LINE_TO_GENERATE;
+                }
                 sa.TECH_Close_Date__c = System.today();
                 fillDoctorConvention(recordList,oldMap); //OAPPMEDCHECK-815
                 
@@ -1022,26 +1114,28 @@ public class ServiceAppointmentManager
         if(absRegWithPackIds!=null&&!absRegWithPackIds.isEmpty()) saToInvoicePerArIdMap = getSaToInvoicePerAbsReg(absRegWithPackIds);
 
         for(Absence_Registration__c ar : [SELECT Id,Is_Contract_Pack__c,Contract_Home__c,Invoicing_Account__c 
-                                                    ,RecordType.DeveloperName
+                                                    ,RecordType.DeveloperName, Status__c
                                         FROM Absence_Registration__c WHERE Id IN:absRegIds])
         {
-
-            if(notClosedSaCountPerArIdMap.get(ar.Id) == null)
+            if(ar.Status__c==AbsenceRegistrationManager.STATUS_RESULT_TO_CUSTOMER)
             {
-                if(ar.Is_Contract_Pack__c && saToInvoicePerArIdMap.get(ar.Id) == null)
+                if(notClosedSaCountPerArIdMap.get(ar.Id) == null)
                 {
-                    ar.Invoicing_Status__c=StaticConstants.AR_INVOICING_STATUS_PREPAYMENT;
-                    absRegToUpdate.add(ar);
-                }
-                else
-                {
-                    ar.Invoicing_Status__c=StaticConstants.AR_INVOICING_STATUS_INVOICE_TO_GENERATE;
-                    ar.TECH_Close_Date__c = System.today();
-                    if(Test.isRunningTest())
+                    if(ar.Is_Contract_Pack__c && saToInvoicePerArIdMap.get(ar.Id) == null)
                     {
-                        ar.TECH_Close_Date__c = System.today().addMonths(-1);
+                        ar.Invoicing_Status__c=StaticConstants.AR_INVOICING_STATUS_PREPAYMENT;
+                        absRegToUpdate.add(ar);
                     }
-                    absRegToUpdate.add(ar);
+                    else
+                    {
+                        ar.Invoicing_Status__c=StaticConstants.AR_INVOICING_STATUS_INVOICE_TO_GENERATE;
+                        ar.TECH_Close_Date__c = System.today();
+                        if(Test.isRunningTest())
+                        {
+                            ar.TECH_Close_Date__c = System.today().addMonths(-1);
+                        }
+                        absRegToUpdate.add(ar);
+                    }
                 }
             }
             
@@ -1193,6 +1287,7 @@ public class ServiceAppointmentManager
 
     public static void fillSAwithInfoToDoctor(List<ServiceAppointment> recordList, Map<Id, ServiceAppointment> recordOldValueMap)
       {
+          
         Set<Id> workOrderIds  = new Set<Id>();
         Set<Id> serviceResIds = new Set<Id>();
         
@@ -1203,11 +1298,11 @@ public class ServiceAppointmentManager
         String employeeAdditionalInfo = 'Werknemer informatie / Information salarié';
         String absenceAdditionalInfo  = 'Afwezigheidsinformatie / Information Absence';
         
-        for (ServiceAppointment sa : recordList)
+        for (ServiceAppointment sa : recordList)            
         {
             if(sa.Assigned_Resource__c!=null && sa.Assigned_Resource__c!=recordOldValueMap.get(sa.Id).Assigned_Resource__c)
             {
-                workOrderIds.add(sa.ParentRecordId);
+                workOrderIds.add(sa.Work_Order_tech__c);
                 serviceResIds.add(sa.Assigned_Resource__c);
             }
         }
@@ -1218,8 +1313,8 @@ public class ServiceAppointmentManager
             Map<Id, ServiceResource> srByIdMap = new Map<Id, ServiceResource>([SELECT Id
                                                                         , IsActive
                                                                         , Native_Language__c
-                                                                FROM ServiceResource
-                                                                WHERE Id IN :serviceResIds]);                                                
+                                                             FROM ServiceResource
+                                                             WHERE Id IN :serviceResIds]);
             
             Map<Id, WorkOrder> woByIdMap = new Map<Id, WorkOrder>([SELECT Id
                                                                         , Absence_Registration__r.Additional_information__c 
@@ -1231,10 +1326,9 @@ public class ServiceAppointmentManager
                                                                 FROM WorkOrder
                                                                 WHERE Id IN :workOrderIds]);
         
-        
             for (ServiceAppointment sa : recordList)
             {
-                if(woByIdMap.containsKey(sa.ParentRecordId) && srByIdMap.containsKey(sa.Assigned_Resource__c))System.debug('jfoRecordList: '+recordList);
+                if(woByIdMap.containsKey(sa.ParentRecordId) && srByIdMap.containsKey(sa.Assigned_Resource__c))
                 {
                     WorkOrder wo = woByIdMap.get(sa.ParentRecordId);
                     ServiceResource sr = srByIdMap.get(sa.Assigned_Resource__c);
@@ -1328,6 +1422,8 @@ public class ServiceAppointmentManager
                                                                     , Share_to_MCM_FR__c, Share_to_MCM_BE__c, EndDate
                                                                     , Optimal_First_Day__c, Optimal_Last_Day__c
                                                                     , City, Work_Type_FR__c, PostalCode
+                                                                    , WorkType.Type_Id__c
+
                                                             FROM WorkOrder
                                                             WHERE Id IN :workOrderIds]);
       
@@ -1357,20 +1453,29 @@ public class ServiceAppointmentManager
                 sa.City_searchable__c= wo.city!=null?wo.city:'';
                 sa.Employee_searchable__c= wo.Employee__r.Name!=null?wo.Employee__r.Name:'';
                 sa.Zip_Code_searchable__c = wo.PostalCode!=null?wo.PostalCode:'';
-                if(wo.work_Type_FR__c == WORKYPE_FR_HV ||wo.work_Type_FR__c ==WORKYPE_FR_HV_CONV)
+                // WAITING ON ANSWER FROM KATRIEN - OAPPMEDCHECK-1181
+                if(wo.WorkType.Type_Id__c == WORKTYPE_FR_HV ||wo.WorkType.Type_Id__c ==WORKTYPE_FR_HV_CONV)
                 {
-                    sa.Request_type_searchable__c = 'Home visit';
+                    //sa.Request_type_searchable__c =  Label.home_visit;
+                    sa.Request_type_searchable_FR__c = 'Visite à domicile';
+                    sa.Request_type_searchable_NL__c = 'Huisbezoek';
                 }
-                else if(wo.work_Type_FR__c == WORKYPE_FR_CONV || wo.work_Type_FR__c == WORKYPE_FR_CONV_HV )
+                else if(wo.WorkType.Type_Id__c == WORKTYPE_FR_CONV || wo.WorkType.Type_Id__c == WORKTYPE_FR_CONV_HV)
                 {
-                    sa.Request_type_searchable__c = 'Convocation';
+                //    sa.Request_type_searchable__c = Label.convocation;
+                    sa.Request_type_searchable_FR__c = 'Convocation';
+                    sa.Request_type_searchable_NL__c = 'Convocatie';
                 }
-                else if(wo.work_Type_FR__c == WORKYPE_FR_ARBITRAGE) 
+                else if(wo.work_Type_FR__c == WORKTYPE_FR_ARBITRAGE) 
                 {
-                    sa.Request_type_searchable__c = 'Arbitrage';
+                    //sa.Request_type_searchable__c = 'Arbitrage';
+                    sa.Request_type_searchable_FR__c = 'Arbitrage';
+                    sa.Request_type_searchable_NL__c = 'Arbitrage';
                 }
-                else if(wo.work_Type_FR__c == WORKYPE_FR_EXPERTISE) {
-                    sa.Request_type_searchable__c = 'Expertise';
+                else if(wo.work_Type_FR__c == WORKTYPE_FR_EXPERTISE) {
+                    //sa.Request_type_searchable__c = 'Expertise';
+                    sa.Request_type_searchable_FR__c = 'Expertise';
+                    sa.Request_type_searchable_NL__c = 'Expertise';
                 }
                 String docFirstName= wo.Absence_Registration__r.Doctor_Firstname__c==null?'':wo.Absence_Registration__r.Doctor_Firstname__c;
                 String docName= wo.Absence_Registration__r.Doctor_Name__c==null?'':wo.Absence_Registration__r.Doctor_Name__c;
@@ -1554,7 +1659,6 @@ public class ServiceAppointmentManager
     {
         //Group SA linked to the same contract pack
         Map<Id,Map<Id,ServiceAppointment>> servApptPerContractHomeIdMap = new Map<Id,Map<Id,ServiceAppointment>>();
-        List<Task> tasks = new List<Task>();
         for(ServiceAppointment sa: recordList)
         {       
             if(sa.Contract_Home__c!=null && sa.Is_Contract_Pack__c && sa.Invoicing_Status__c==INVOICING_STATUS_INVOICE_DETAIL_LINE_TO_GENERATE 
@@ -1581,7 +1685,7 @@ public class ServiceAppointmentManager
                 Set<Id> notAssignedSA;
         */
         List<contractMCM> ctrMCMList = new List<contractMCM>(); 
-        for(Contract_Home__c c : [SELECT Id, (SELECT Id, Service__r.Service_Category__c , Service__r.Visit_Type__c, Pack_saldo__c FROM Contractual_Service_Line_Items__r WHERE Service__r.Visit_Type__c=:SERVICE_IDENTIFICATOR_HOME_VISIT OR Service__r.Visit_Type__c=:SERVICE_IDENTIFICATOR_CONVOCATION OR Service__r.Service_Category__c='Pack') 
+        for(Contract_Home__c c : [SELECT Id, (SELECT Id, Service__r.Service_Category__c , Service__r.Visit_Type__c, Service__r.Pack_Type__c, Pack_saldo__c FROM Contractual_Service_Line_Items__r WHERE Service__r.Visit_Type__c=:SERVICE_IDENTIFICATOR_HOME_VISIT OR Service__r.Visit_Type__c=:SERVICE_IDENTIFICATOR_CONVOCATION OR Service__r.Service_Category__c='Pack' ORDER BY Start_Date__c ASC) 
                                 FROM Contract_Home__c
                                 WHERE Id IN:servApptPerContractHomeIdMap.keySet()])
         { 
@@ -1595,6 +1699,7 @@ public class ServiceAppointmentManager
                 cslitem.cslitemId = csli.Id;
                 cslitem.serviceCategory = csli.Service__r.Service_Category__c;
                 cslitem.remaningQuantity = Integer.valueOf(csli.Pack_saldo__c);
+                cslitem.isPrivilegedPack = csli.Service__r.Pack_Type__c=='Privileged'? true:false;
                 switch on csli.Service__r.Service_Category__c {
                     when 'Basic fee per service' {
                         switch on csli.Service__r.Visit_Type__c {
@@ -1610,7 +1715,6 @@ public class ServiceAppointmentManager
                         csliMCMList.add(cslitem);
                     }
                 }
-                
             }
             ctr.cslisPack = csliMCMList;
             ctrMCMList.add(ctr);
@@ -1620,28 +1724,32 @@ public class ServiceAppointmentManager
         for(contractMCM ctr: ctrMCMList)
         {
             Set<Id> notAssignedSA = ctr.notAssignedSA;
+            System.debug('QLE notAssignedSA ' + notAssignedSA);
             for(csliMCM csli : ctr.cslisPack)
             {
-                for(Id saId : notAssignedSA)
+                System.debug('QLE csli.remaningQuantity ' + csli.remaningQuantity);
+                if(csli.remaningQuantity > 0)
                 {
-                    if(csli.remaningQuantity > 0)
+                    for(Id saId : notAssignedSA)
                     {
+                        System.debug('QLE notAssignedSA ' + notAssignedSA);
                         ServiceAppointment sa  = servApptPerContractHomeIdMap.get(ctr.ctrId).get(saId);
                         sa.Contractual_Service_Line_Item__c = csli.cslItemId;
                         csli.remaningQuantity = csli.remaningQuantity - 1;
-                        sa.Invoicing_Status__c = INVOICING_STATUS_PREPAYMENT;
+                        System.debug('QLE csli.isPrivilegedPack ' + csli.isPrivilegedPack); 
+                        if(csli.isPrivilegedPack==false) sa.Invoicing_Status__c = INVOICING_STATUS_PREPAYMENT;
                         notAssignedSA.remove(sa.Id);
                     }
-                    else {
-                        break;
-                    }
+                    System.debug('QLE sa.Contractual_Service_Line_Item__c ' + notAssignedSA); 
                 }
             }
             if(!notAssignedSA.isEmpty())
             {
+                System.debug('QLE notAssignedSA ' + notAssignedSA); 
                 for(Id saId : notAssignedSA)
                 {
                     ServiceAppointment sa = servApptPerContractHomeIdMap.get(ctr.ctrId).get(saId);
+                    System.debug('QLE sa ' + sa); 
                     if(sa.Home_Visit__c && ctr.csliBasicFeeHomeVisit!=null) 
                     {
                         sa.Contractual_Service_Line_Item__c = ctr.csliBasicFeeHomeVisit.cslitemId;
@@ -1650,11 +1758,10 @@ public class ServiceAppointmentManager
                     {
                         sa.Contractual_Service_Line_Item__c = ctr.csliBasicFeeConvocation.cslitemId;
                     }
-                    tasks.add(generateTaskMCMQueue(sa.OwnerId,null,sa.Id,Label.CustomerPack0 ,Label.LastServiceOfPackIsUsed,AbsenceRegistrationManager.TASK_DELAY));
                 }
             }
         }
-        if(!tasks.isEmpty()) insert tasks;
+
         
     }
     
@@ -1737,193 +1844,184 @@ public class ServiceAppointmentManager
     * @author       Novera - AMU
     * @date         2020-02-15
     * @description  OAPPMEDCHECK 178- Notify customer of a resource assigned by email
-    * @param        
-    * @return       
+    * @param
+    * @return
     ********************************************************************************/
+
     public static void sendIntermediaryChangeAssignedResource(List<ServiceAppointment> recordList, Map<Id, ServiceAppointment> recordOldValueMap)
     {
         Set<Id> setAbsenceIds = new Set<Id>();
-        Id saId;
-        Id absenceId;
-        ID absenceOwnerId;
-        String absenceRT;
         List <Recipients_Absence_Query.flowInputs> lstInputs = new List <Recipients_Absence_Query.flowInputs>();
+        List <Task> alertTasks           = new List <Task>();
+        Map  <Id, Contact> mapRecipients = new Map <Id, Contact>();
+
+        system.debug('AMU sendIntermeAss ');
 
         for(ServiceAppointment sa : recordList)
-        {   
-            if(sa.status == 'Scheduled' && recordOldValueMap.get(sa.Id).Status != 'Scheduled' )
+        {
+            if(sa.Absence_Registration_RT__c=='BE' && sa.status == 'Scheduled' && recordOldValueMap.get(sa.Id).Status != 'Scheduled' )
             {
                 setAbsenceIds.add(sa.Absence_Registration__c);
-                saId = sa.Id;
             }
         }
 
-        if(!setAbsenceIds.isEmpty()) //sa?
-        { 
+        if(!setAbsenceIds.isEmpty())
+        {
             //Get the list of absences ids in the SA records
-            Map<Id, Absence_Registration__c> absencesByIdMap = new Map<Id, Absence_Registration__c>([SELECT Id, Account__c, Main_Account__c, 
-                                                                                                            OwnerId, RecordType.DeveloperName, Result_Code__c
-                                                                                                    FROM Absence_Registration__c
-                                                                                                    WHERE Id IN :setAbsenceIds]);
-            System.debug('absencesByIdMap:' +absencesByIdMap);
+            Map<Id, Absence_Registration__c> absencesByIdMap = new Map<Id, Absence_Registration__c>([SELECT Id, Account__c, Main_Account__c, OwnerId, RecordType.DeveloperName
+            FROM Absence_Registration__c
+            WHERE Id IN :setAbsenceIds]);
 
             //If the absences list is not empty, send parameters to the apex query recipients class
-            if(!absencesByIdMap.isEmpty()){
-                for (Absence_Registration__c abs : absencesByIdMap.values()) 
+            if(!absencesByIdMap.isEmpty())
+            {
+                for (Absence_Registration__c abs : absencesByIdMap.values())
                 {
                     Recipients_Absence_Query.flowInputs Inputs = new Recipients_Absence_Query.flowInputs();
                         Inputs.absenceAccountId = abs.Account__c;
                         Inputs.mainAccountId    = abs.Main_Account__c;
-                        absenceId               = abs.id;
-                        absenceOwnerId          = abs.OwnerId;
-                        absenceRT               = abs.RecordType.DeveloperName;
                     lstInputs.add(Inputs);
                 }
-            }
 
-            List<Task> alertTasks = new List<Task>();
-            Map<Id, Contact> mapRecipients = new Map<Id, Contact>();
-                
-                
-            //Collect the contact recipients lists output
-            List <Recipients_Absence_Query.Response> Responses = Recipients_Absence_Query.retrieveInputs(lstInputs);
-                    
-            for(Recipients_Absence_Query.Response res: Responses){
-                if(absenceRT == 'MCM_BE' && !res.AssignedResource_Recipients.isEmpty())
+                //Collect the contact recipients lists output
+                List <Recipients_Absence_Query.Response> Responses = Recipients_Absence_Query.retrieveInputs(lstInputs);
+
+                for (Absence_Registration__c abs : absencesByIdMap.values())
                 {
-                    mapRecipients.putall(res.AssignedResource_Recipients);
-                }          
-            }
+                    for(Recipients_Absence_Query.Response res: Responses){
+                        if(!res.AssignedResource_Recipients.isEmpty())
+                        {
+                            mapRecipients.putall(res.AssignedResource_Recipients);
+                        }
+                    }
 
-            //Update the contact to trigger email alert
-            if(mapRecipients.size() > 0) {
-                for(contact con : mapRecipients.values()) {
-                    con.TECH_Notify_employer_assignedResource__c = true;
-                    con.Tech_Related_To__c = saId; //should be the sa id or the absence id?
+                    //Update the contact to trigger email alert
+                    if(mapRecipients.size() > 0)
+                    {
+                        for(contact con : mapRecipients.values())
+                        {
+                            con.TECH_Notify_employer_assignedResource__c = true;
+                            con.Tech_Related_To__c = abs.Id;
+                        }
+                    }
+
+                    else if(mapRecipients.size() == 0)
+                    {
+                        Task myTask = new Task();
+                        myTask.ActivityDate = System.today();
+                        myTask.subject     = System.Label.FlowNoRecipientsAssignedResource;
+                        myTask.Description = System.Label.FlowNoRecipientsAssignedResource;
+                        myTask.OwnerId     = abs.OwnerId!=null?abs.OwnerId:UserInfo.getUserId();
+                        myTask.Status      = 'Open';
+                        myTask.WhatId      = abs.Id;
+
+                        alertTasks.add(myTask);
+                    }
                 }
-                        
-                update mapRecipients.values();
-                System.debug('updated emailRecipients:' +mapRecipients.values());
-            }
-            
-            else if(mapRecipients.size() == 0) {
-                Task myTask = new Task();
-                    myTask.ActivityDate = System.today();
-                    myTask.subject     = System.Label.Flow_No_Recipents_Found;
-                    myTask.Description = System.Label.Flow_No_Recipents_Found;
-                    myTask.OwnerId     = absenceOwnerId;
-                    myTask.Status      = 'Open';
-                    myTask.WhatId      = absenceId; //sa ou absence?
-                
-                alertTasks.add(myTask);                
-            }
-            if(alertTasks.size() > 0) {
-                insert alertTasks;             
+
+                if(mapRecipients.size() > 0)
+            	{
+            	    update mapRecipients.values();
+            	}
+
+                //Switch back tech checkboxes to false after operation
+                if(mapRecipients.size() > 0)
+            	{
+                    for(contact con : mapRecipients.values())
+                    {
+                        con.TECH_Notify_employer_assignedResource__c = false;
+                        con.Tech_Related_To__c = null;
+                    }
+
+                    update mapRecipients.values();
+            	}
+
+                if(alertTasks.size() > 0)
+                {
+                    insert alertTasks;
+                }
             }
         }
     }
 
 
-    /*******************************************************************************
-    * @author       Novera - JFO
-    * @date         2020-02-15
-    * @description  OAPPMEDCHECK 180- Notify customer of visit result by email
-    * @param        
-    * @return       
-    ********************************************************************************/
-
-    public static void sendReportVisitRecipients(List<ServiceAppointment> recordList, Map<Id, ServiceAppointment> recordOldValueMap)
-    {
+/*******************************************************************************
+* @author       Novera - JFO
+* @date         2020-02-15
+* @description  OAPPMEDCHECK 180- Notify customer of visit result by email
+                Need to work in without sharing mode to allow doctors in the portal 
+                to trigger the notification
+* @param        List of SA in adequate status and Map of SA old values
+* @return       Void
+********************************************************************************/    
     
+    public static void sendReportVisitRecipients(List<ServiceAppointment> recordList, Map<Id, ServiceAppointment> recordOldValueMap){
+   
         Set<Id> setAbsenceIds = new Set<Id>();
-        List <Recipients_Absence_Query.flowInputs> lstInputs = new List <Recipients_Absence_Query.flowInputs>();
-        List <String> resultCodes = new List <String> {'1 - In disagreement', '7 - Not in accordance for visit date', '8 - Early resumption in agreement with attending physician'};
-        Id absenceId;
-        ID absenceOwnerId;
-        String absenceRT;
-        String absenceResultCode;
-         
+        
         for(ServiceAppointment sa : recordList)
         {   
-            if(sa.status == 'Result to customer' && recordOldValueMap.get(sa.Id).Status != 'Result to customer' )
+            if(sa.status == STATUS_RESULT_TO_CUSTOMER && recordOldValueMap.get(sa.Id).Status != STATUS_RESULT_TO_CUSTOMER)
             {
                 setAbsenceIds.add(sa.Absence_Registration__c);
             }
         }
-        System.debug('setAbsenceIds:' +setAbsenceIds);
+
+        if(!setAbsenceIds.IsEmpty())
+        {
+            MCM_Notify_Customer_ReportVisits.sendResults(setAbsenceIds, null);
+        }
+    }
+
+
+
+/*******************************************************************************
+* @author       Novera - JFO
+* @date         2020-02-15
+* @description  OAPPMEDCHECK-1042: Send extra information from doctor on SA to customer
+                Resend additional information to the customer
+* @param        List of SA in adequate status and Map of SA old values
+* @return       Void
+********************************************************************************/
+
+    public static void resendReportVisitToCustomer(List<ServiceAppointment> recordList, Map<Id, ServiceAppointment> recordOldValueMap){
+    
+        Set<Id> setAbsenceIds = new Set<Id>();
+        List <Absence_Registration__c> lstAbsences = new List <Absence_Registration__c>();
         
+        for(ServiceAppointment sa : recordList)
+        {   
+            if(sa.status == STATUS_RESULT_TO_CUSTOMER && sa.Tech_Resend_email_to_customer__c == True && recordOldValueMap.get(sa.Id).Tech_Resend_email_to_customer__c != True )
+            {
+                setAbsenceIds.add(sa.Absence_Registration__c);
+            }
+        }
+        
+        if(!setAbsenceIds.IsEmpty())
+        {
+            Map<Id, Absence_Registration__c> mapAbs =  new Map<Id, Absence_Registration__c>([select Id, Additional_info_for_customer__c, Account__c, 
+                                                                                             Main_Account__c, OwnerId, RecordType.DeveloperName, Result_Code__c
+                                                            from Absence_Registration__c where ID IN:setAbsenceIds]);
+            
+            for (ServiceAppointment sa: recordList) 
+            {
+               Absence_Registration__c abs =  mapAbs.get(sa.Absence_Registration__c);
+               sa.Tech_Resend_email_to_customer__c = false;
+               abs.Additional_info_for_customer__c = sa.Additional_info_for_customer__c;
+            }
+            update mapAbs.values();
+            
+            lstAbsences.addall(mapAbs.values());
+            
+            
+            MCM_Notify_Customer_ReportVisits.sendResults(setAbsenceIds, lstAbsences);
+        }        
+    }
 
-        if(!setAbsenceIds.isEmpty()) {
-            
-            //Get the list of absences ids in the SA records
-            Map<Id, Absence_Registration__c> absencesByIdMap = new Map<Id, Absence_Registration__c>([SELECT Id, Account__c, Main_Account__c, OwnerId, RecordType.DeveloperName, Result_Code__c
-                                                                              FROM Absence_Registration__c
-                                                                              WHERE Id IN :setAbsenceIds]);
-            System.debug('absencesByIdMap:' +absencesByIdMap);
-            
-            
-            //If the absences list is not empty, send parameters to the apex query recipients class
-            if(!absencesByIdMap.isEmpty()){
-                for (Absence_Registration__c abs : absencesByIdMap.values()) {
-                    
-                    Recipients_Absence_Query.flowInputs Inputs = new Recipients_Absence_Query.flowInputs();
-                        Inputs.absenceAccountId = abs.Account__c;
-                        Inputs.mainAccountId    = abs.Main_Account__c;
-                        absenceId               = abs.id;
-                        absenceOwnerId          = abs.OwnerId;
-                        absenceRT               = abs.RecordType.DeveloperName;
-                        absenceResultCode       = abs.Result_Code__c;
-                    lstInputs.add(Inputs);
-                }
-            }    
-            
+    
+/*******************************************************************************
 
-            List <Task> alertTasks           = new List <Task>();
-            Map  <Id, Contact> mapRecipients = new Map <Id, Contact>();
-            
-            
-            //Collect the contact recipients lists output
-            List <Recipients_Absence_Query.Response> Responses = Recipients_Absence_Query.retrieveInputs(lstInputs);
-                    
-            for(Recipients_Absence_Query.Response res: Responses){
-                if(absenceRT == 'MCM_BE' && (!(res.EarlyResumption_Recipients).isEmpty()) && resultCodes.contains(absenceResultCode)){
-                    mapRecipients.putall(res.EarlyResumption_Recipients);
-                    }
-                else {
-                    mapRecipients.putall(res.emailRecipients);
-                    }                  
-            }
-            
-                    
-            //Update the contact to trigger email alert
-            if(mapRecipients.size() > 0) {
-                for(contact con : mapRecipients.values()) {
-                    con.Tech_Trigger_Workflow_Alert__c = true;
-                    con.Tech_Related_To__c = absenceId;
-                 }
-                        
-                update mapRecipients.values();
-                System.debug('updated emailRecipients:' +mapRecipients.values());
-            }
-            
-            else if(mapRecipients.size() == 0) {
-                Task myTask = new Task();
-                    myTask.ActivityDate = System.today();
-                    myTask.subject     = System.Label.Flow_No_Recipents_Found;
-                    myTask.Description = System.Label.Flow_No_Recipents_Found;
-                    myTask.OwnerId     = absenceOwnerId;
-                    myTask.Status      = 'Open';
-                    myTask.WhatId      = absenceId;
-                
-                alertTasks.add(myTask);                
-            }
-            if(alertTasks.size() > 0) {
-                insert alertTasks;             
-            }
-        }                
-    } 
-    
-    
+********************************************************************************/    
     public class contractMCM
     {
         public Id ctrId;
@@ -1938,12 +2036,14 @@ public class ServiceAppointmentManager
         public Id cslitemId;
         public String serviceCategory;
         public Integer remaningQuantity;
+        public Boolean isPrivilegedPack; //OAPPMEDCHECK-1001
     }
 
     public class contractInfoForInvoicing
     {
         Map<Id,Decimal> kmInForfaitPerCtrId; 
         Map<Id,Map<Id,Decimal>> pricePerServIdPerCtrId;
+        Set<Id> csliWithPrivilegedPack; //OAPPMEDCHECK-1001
     }
 
     public class saliSaveResult

@@ -3,10 +3,21 @@ public class ContractualServiceLineItemManager
     public static Service__c packFrService{
         get{
             if(packFrService==null){
-                Service__c service = [SELECT Id, Order__c, Service_Name_FR__c FROM Service__c WHERE Available_for_country__c='FR' AND Service_category__c='Pack' LIMIT 1];
+                Service__c service = [SELECT Id, Order__c, Service_Name_FR__c FROM Service__c WHERE Available_for_country__c='FR' AND Service_category__c='Pack' AND Pack_Type__c='Standard' LIMIT 1];
 				packFrService = service;
             }
             return packFrService;
+        }
+        set;
+    }
+
+    public static Service__c packPrivFrService{
+        get{
+            if(packPrivFrService==null){
+                Service__c service = [SELECT Id, Order__c, Service_Name_FR__c FROM Service__c WHERE Available_for_country__c='FR' AND Service_category__c='Pack' AND Pack_Type__c='Privileged'  LIMIT 1];
+				packPrivFrService = service;
+            }
+            return packPrivFrService;
         }
         set;
     }
@@ -156,6 +167,8 @@ public class ContractualServiceLineItemManager
 
     }
 
+    // COMMENTED OUT FOR RELEASE MCM SEPTEMBER 2021 - WILL BE FOR NOVEMBER 2021
+
     /*******************************************************************************
     * @author		Novera - QLE
     * @date		    2020-12-03
@@ -171,11 +184,11 @@ public class ContractualServiceLineItemManager
         List<Invoice__c> invoicesToCreate = new List<Invoice__c>(); 
         Map<Id,Invoice__c> invoiceToCreatePerCsliId = new Map<Id,Invoice__c>();
         List<Task> taskToInsert = new List<Task>();
-
+        
         for(Contractual_Service_Line_Item__c csli : recordList)
         {
-            if(csli.Parent_Contract_RT__c == ContractHomeManager.CONTRACT_HOME_RT_MCM_FR_CONTRACT && csli.Service__c == packFrService.Id  
-                && csli.Is_From_Versioning__c==false && csli.Is_From_Migration__c==false)
+            if(csli.Parent_Contract_RT__c == ContractHomeManager.CONTRACT_HOME_RT_MCM_FR_CONTRACT && csli.Is_From_Versioning__c==false && csli.Is_From_Migration__c==false
+                && (csli.Service__c == packFrService.Id || csli.Service__c == packPrivFrService.Id ))
             {
                 csliList.add(csli);
                 ctrIds.add(csli.Contract_Home__c);
@@ -234,7 +247,7 @@ public class ContractualServiceLineItemManager
             if(!taskToInsert.isEmpty()) insert taskToInsert;
         }
     }
-
+    
     /*******************************************************************************
     * @author		Novera - QLE
     * @date		    2020-04-13
@@ -244,6 +257,7 @@ public class ContractualServiceLineItemManager
     * @return		voice
     ********************************************************************************/
     
+    /*OAPPMEDCHECK-1212
     public static void createYearlyContributionInvoicing(List<Contractual_Service_Line_Item__c> recordList, Map<Id,Contract_Home__c> parentMap)
     {   
        
@@ -327,6 +341,7 @@ public class ContractualServiceLineItemManager
             if(!taskToInsert.isEmpty()) insert taskToInsert;
         }
     }
+    */
    
     /*******************************************************************************
     * @author		Novera - QLE
@@ -336,8 +351,11 @@ public class ContractualServiceLineItemManager
     * @return		voice
     ********************************************************************************/
     
+/*     
+    QLE OAPPMEDCHECK-1212
     public static void checkInvoicingRecipient(List<Contractual_Service_Line_Item__c> recordList)
     {   
+        System.debug('QLE checkInvoicingRecipient');
         Set<Id> ctrIds = new Set<Id>();
         Set<Id> invAccIds = new Set<Id>();
         Map<Id,Id> invAccPerCtrId = new Map<Id,Id>();
@@ -345,7 +363,7 @@ public class ContractualServiceLineItemManager
         Map<Id,Id> recipientIdPerInvAccIdMap = new Map<Id,Id>();
         for(Contractual_Service_Line_Item__c csli : recordList)
         {
-            if(!csli.Parent_contract_is_specific__c && csli.Parent_Contract_RT__c == ContractHomeManager.CONTRACT_HOME_RT_MCM_FR_CONTRACT && csli.Is_From_Versioning__c==false
+            if(!csli.Is_From_Migration__c && csli.Parent_contract_is_specific__c && csli.Parent_Contract_RT__c == ContractHomeManager.CONTRACT_HOME_RT_MCM_FR_CONTRACT && csli.Is_From_Versioning__c==false
                 && (csli.Service__c == packFrService.Id || csli.Service__c == annualFeeFrService.Id))
             {
                 ctrIds.add(csli.Contract_Home__c);
@@ -389,9 +407,10 @@ public class ContractualServiceLineItemManager
             }
         }
 
-    }
+    } */
 
 
+    //QLE 17-09-21 - is for BE
     /*******************************************************************************
     * @author		Novera - TLE
     * @date		    2021-08-18
@@ -400,6 +419,7 @@ public class ContractualServiceLineItemManager
     * @param		Map<Id, Contractual_Service_Line_Item__c> Map of Old CSLIs     
     * @return		voice
     ********************************************************************************/
+    /*
     public static void checkIfContractServiceInUse(List<Contractual_Service_Line_Item__c> recordList, Map<Id, Contractual_Service_Line_Item__c> recordOldValueMap){
         Set<String> contractIds = new Set<String>();
         Set<String> setCheckIds = new Set<String>();
@@ -452,8 +472,9 @@ public class ContractualServiceLineItemManager
         }
     
     }
+    */
 
-
+    //QLE 17-09-21  - is for BE
     /*******************************************************************************
     * @author		Novera - TLE
     * @date		    2021-08-18
@@ -462,6 +483,7 @@ public class ContractualServiceLineItemManager
     * @param		Map<Id, Contractual_Service_Line_Item__c> Map of Old CSLIs     
     * @return		voice
     ********************************************************************************/
+    /*
     public static void deleteContractServiceInUse(List<Contractual_Service_Line_Item__c> recordList){
         Set<String> contractIds = new Set<String>();
         Set<String> setCheckIds = new Set<String>();
@@ -499,14 +521,17 @@ public class ContractualServiceLineItemManager
             }
         }
     }
+    /*
 
 
+    /QLE 17-09-21  - is for BE
     /*******************************************************************************
     * @author		Novera - TLE
     * @date		    2021-08-18
     * @description  OAPPMEDCHECK-957 Get Set of BE Contract Record Type      
     * @return		voice
     ********************************************************************************/
+    /*
     public static Set<String> beContRecordType{
         get{
             if(beContRecordType == null){
@@ -527,5 +552,6 @@ public class ContractualServiceLineItemManager
 
         set;
     }
+    */
 
 }

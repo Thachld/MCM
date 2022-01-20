@@ -271,6 +271,7 @@ public with sharing class createCreditNoteController {
             // newIlI.Unit_Price__c = isKm&&totalKm>0?totalAmount/totalKm:quantity>0?totalAmount/quantity:null;
             newIlI.Quantity__c = isKm||isMisc?null:quantity;
             newIlI.Amount_Excluding_VAT_Currency__c = totalAmount * -1;
+            newIlI.Unit_Price__c = (newIlI.Unit_Price__c==null?0:newIlI.Unit_Price__c) * -1;
             
             return newIlI;
 
@@ -297,11 +298,12 @@ public with sharing class createCreditNoteController {
             for(InvoiceLineItem__c oldIli : listOldIlis){
                 InvoiceLineItem__c newIlI = oldIli.clone(false,false,false,false);
                 newIlI.Invoice__c = newCreditnoteId;  
+
                 newIlI.Amount_Excluding_VAT_Currency__c = (newIlI.Amount_Excluding_VAT_Currency__c ==null?0:newIlI.Amount_Excluding_VAT_Currency__c) * -1;
                 newIlI.Amount_Including_VAT_Currency__c = (newIlI.Amount_Including_VAT_Currency__c== null?0:newIlI.Amount_Including_VAT_Currency__c) * -1;
                 newIlI.Amount_Including_VAT__c = (newIlI.Amount_Including_VAT__c==null?0:newIlI.Amount_Including_VAT__c) * -1;
                 newIlI.Amount_Excluding_VAT__c = (newIlI.Amount_Excluding_VAT__c==null?0:newIlI.Amount_Excluding_VAT__c) * -1;
-                
+                newIlI.Unit_Price__c = (newIlI.Unit_Price__c==null?0:newIlI.Unit_Price__c) * -1;
                 listInsert.add(newIlI);
             }
 

@@ -133,7 +133,7 @@ public with sharing class createCreditNoteController_TEST {
                                         ,Version__c=1
                                         // ,Product__c = p.Id
                                         ,RecordTypeId=ContractHomeManager.mcmRtFRId
-                                        ,Service_Type__c = StaticConstants.TYPE_REGISTRATION_CERTIFICATES
+                                        ,Service_Type__c = StaticConstants.TYPE_MEDICAL_CHECK_ILLNESS
                                         ,Amount_of_km_in_forfait__c=20);
             ctrHList.add(ctrH);
         }
